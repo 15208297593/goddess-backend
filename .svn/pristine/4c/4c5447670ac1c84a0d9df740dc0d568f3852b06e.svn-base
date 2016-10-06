@@ -1,0 +1,188 @@
+<% var toolbar = { %> 
+<%};
+var dialog = { %> 
+<%};
+var datagrid = { %> 
+    
+    <table id="tg" title="" class="easyui-treegrid" style="width:610px;height:600px"
+        url="${cxt!}/admin/scene/sceneTree"
+        toolbar="#toolbar" idField="id" treeField="name"
+        rownumbers="false" singleSelect="true">
+        <thead>
+            <tr>
+                <th field="name" width="300">名称</th>
+                <th field="code" width="50" align='center'>code</th>
+                <th field="desc" width="100" align='center'>描述</th>
+                <th field="action" width="150" formatter="treeActions" align='center'>操作</th>
+            </tr>
+        </thead>
+    </table>
+    <div id="scenedlg" class="easyui-dialog" style="width:1000px;height:600px;padding:10px 20px" closed="true" buttons="#dlg_buttons">
+    </div>
+<%};
+var dlg_buttons = { %> 
+    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-ok" onclick="save()" style="width:120px">保存</a>
+    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-cancel" onclick="javascript:$('#scenedlg').dialog('close')" style="width:90px">取消</a>
+<%};
+var otherDialogs = { %> 
+    
+    <div id="otherdlg" class="easyui-dialog" style="width:750px;height:450px;padding:10px 20px" modal="true" closed="true">
+        <div id="otherToolbar" style="padding-bottom:5px;">
+            <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-add" onclick="addScene()">添加新场景</a>
+        </div>
+	    <table id="dg">
+	    </table>
+    </div>
+    
+<%};
+include("/listLayout.html",
+        {toolbar:toolbar,
+        dialog:dialog, 
+        datagrid:datagrid,
+        dlg_buttons:dlg_buttons,
+        otherDialogs:otherDialogs,
+        dialog_title:"更新场景"}){}
+%>
+
+<script type="text/javascript">
+
+  $(function(){
+    $('#fm').attr('enctype', 'multipart/form-data');
+  });
+
+  function formatPic(value, row, index) {
+      if (!value) value="default.jpg";
+      return '<img src="${imageUrl!}/' + value +'" style="width:150px;height:auto;padding:5px" >'
+  }
+  
+  function treeActions(value, row) {
+	  if (row.type != 'location') return;
+	  
+      var page = $("#tg").treegrid("getParent", row.id);
+      var terminal = $("#tg").treegrid("getParent", page.id);
+
+      var param = [terminal.code,page.code,row.code,row.destination||"",row.rank||""].join('-');
+      var e = '<a href="#" onclick=\'editSceneByCode("'+param+'","'+row.id+'")\'>编辑场景</a><br/> ';
+      var em = '<a href="#" onclick=\'editMultiScene("'+param+'","'+row.id+'")\'>编辑多个场景</a><br/> ';
+      if (row.multi) {
+    	  return em;
+      }
+      return e;
+  }
+  
+  function editSceneByCode(param, id){
+    node = $("#tg").treegrid("find", id);
+    multi = 0;
+    $('#scenedlg').dialog({
+        closed: false,
+        cache: false,
+        title: "编辑场景",
+        href:"${cxt!}/admin/scene/getSceneByCode/"+param
+    });
+  }
+  
+    function editMultiScene(sParam, id) {
+      param = sParam;
+      multi = 1;
+      node = $("#tg").treegrid("find", id);
+      $('#dg').datagrid({
+          title:'',
+          iconCls:'icon-edit',
+          width:680,
+          height:380,
+          singleSelect:true,
+          idField:'scene_id',
+          url:'${cxt!}/admin/scene/getScenes/'+sParam,
+          toolbar:"#otherToolbar",
+          columns:[[
+
+              {field:"scene_id", width:50, align:'center', title:'场景id'},
+              {field:"scene_name", width:110,title:"场景名称"},
+              {field:"scene_name_ext", width:120,title:"场景名称(英文)"},
+              {field:"scene_pic", width:150, formatter:formatPic, align:'center',title:"场景图片"},
+              {field:"rank", width:80, align:'center',title:"显示顺序"},
+              {field:"action", width:150, formatter:actions, align:'center',title:"操作"}
+          ]]
+      });
+      $('#otherdlg').dialog('open').dialog('setTitle','');
+  }
+  
+  function actions(value, row, index) {
+
+      var e = '<a href="#" onclick=\'editSceneById("'+row.scene_id+'")\'>编辑场景</a><br/> ';
+      var d = '<a href="#" onclick="deleteScene('+row.scene_id+','+index+')">删除场景</a><br/> ';
+      return e+d;
+  }
+  
+  var multi,param,node;
+  function addScene(){
+
+    $('#scenedlg').dialog({
+        closed: false,
+        cache: false,
+        title: "添加场景",
+        href:"${cxt!}/admin/scene/initScene/"+param
+    });
+  }
+  
+  function editSceneById(param){
+    $('#scenedlg').dialog({
+        closed: false,
+        cache: false,
+        title: "编辑场景",
+        href:"${cxt!}/admin/scene/getSceneById/"+param
+    });
+  }
+  
+  function deleteScene(id, index){
+    $.messager.confirm('删除场景','确定删除该场景吗?',function(r){
+        if (r){
+            // 删除场景
+            $.get('${cxt!}/admin/scene/deleteScene/' + id,
+            function(result){
+              if (result.errorMsg){
+                $.messager.alert( 'Error', result.errorMsg);
+              } else {
+                $('#dg').datagrid('deleteRow', index);
+              }
+            },'json');
+        }
+    });
+  }
+
+  function changeImg(obj) {
+    $(obj).prev().children(":first").click();
+  }
+
+  function uploadFile(obj) {
+    var fi = obj.files[0];
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        $(obj).next().attr('src', e.target.result);
+    };
+    reader.readAsDataURL(fi);
+  }
+  
+  function associateCommodities() {
+    var cur = {};
+    $(":checkbox[name^='scene_commodity_']:checked").each(function() {
+    	cur[commodity_id]=$(this).val();
+    });
+    JSON.stringify(cur)
+
+    $.post('${cxt!}/admin/scene/updateRelatedCommodities/',
+      {
+    	scene_id:$("#scene_id").val(),
+    	scene_commodities:JSON.stringify(cur)
+      },
+      function(result){
+      if (result.errorMsg){
+        $.messager.alert( 'Error', result.errorMsg, "error");
+      } else {
+        $('#dlg').dialog('close');        // close the dialog
+        $('#dg').datagrid('reload');      // reload data
+      }
+    },'json');
+  }
+  
+</script>

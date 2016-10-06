@@ -1,0 +1,129 @@
+<div style="padding:3px">
+  
+  <% if(!isEmpty(classifications)) { %>
+      <% for (category in classifications) { %>
+        <div class="float-left">
+          <label>${category.value.name!}</label>
+        </div>
+        <div style="margin-left:50px">
+          <ul style="margin:0px;padding:0px">
+        <% for (classification in category.value.children) { %>
+          <li style="list-style:none;float:left;">
+            <input type="checkbox" name="classification_${classification.id}" value="${classification.id}" />${classification.name}
+          </li>
+        <% } %>
+          </ul>
+        </div>
+        <div style="clear:both;margin-bottom: 10px;"></div>
+      <% } %>
+  <% } %>
+  <div style="clear:both;margin-bottom: 10px;"></div>
+  
+  <div class="float-left"><label>品牌</label></div>
+  <% if(!isEmpty(brands)) { %>
+      <div style="margin-left:50px">
+        <ul style="margin:0px;padding:0px">
+        <% for (b in brands) { %>
+          <li style="list-style:none;float:left;">
+            <input type="checkbox" name="brand_${b.brand_id}" value="${b.brand_id}" />${b.brand_name}
+          </li>
+        <% } %>
+        </ul>
+      </div>
+  <% } %>
+  <div style="clear:both;margin-bottom: 10px;"></div>
+  
+  <% if(!isEmpty(catalogTree)) { %>
+      <% for (catalog in catalogTree) { %>
+        <div class="float-left">
+          <label>${catalog.name!}</label>
+        </div>
+        <div style="margin-left:50px">
+          <ul style="margin:0px;padding:0px">
+        <% for (c in catalog.children) { %>
+          <li style="list-style:none;float:left;">
+            <input type="checkbox" name="catalog_${c.id}" value="${catalog.id}@${c.id}" />${c.name}
+          </li>
+        <% } %>
+          </ul>
+        </div>
+        <div style="clear:both;margin-bottom: 10px;"></div>
+      <% } %>
+  <% } %>
+  <div style="clear:both;margin-bottom: 10px;"></div>
+  <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-search" onclick="doSearch()">检索</a>
+</div>
+<table id="dg">
+</table>
+<script type="text/javascript">
+
+  function doSearch() {
+    
+    var classification_ids = $('[name^=classification_]:checked').map(function() {
+    	return $(this).val();
+    }).get().join('_');
+    var brand_ids = $('[name^=brand_]:checked').map(function() {
+    	return $(this).val();
+    }).get().join('_');
+    var catalog_ids = $('[name^=catalog_]:checked').map(function() {
+    	return $(this).val();
+    }).get().join('_');
+    
+    $('#dg').datagrid({
+        title:'',
+        iconCls:'icon-edit',
+        width:1015,
+        height:700,
+        singleSelect:true,
+        checkOnSelect:true,
+        idField:'commodity_id',
+        pagination:true,
+        url:"${cxt!}/admin/commodity/searchCommodities/",
+        queryParams: {
+        	commodity_status: '1',
+            classification_ids:classification_ids,
+            brand_ids:brand_ids,
+            catalog_ids:catalog_ids
+        },
+        columns:[[
+            {field:'ck',checkbox:'true'},
+            {field:'commodity_id',title:'id',width:50,align:'center'},
+            {field:'commodity_name',title:'名称',width:100,align:'center'},
+            {field:'commodity_pic',title:'图片',width:200,formatter:formatPic,align:'center'},
+            {field:'price',title:'价格',width:100,align:'center'},
+            {field:'brand_name',title:'所属品牌',width:100,align:'center'}
+        ]]
+    });
+  }
+  
+  function formatPic(value, row, index) {
+    if (!value) value="default.jpg";
+    return '<img src="${imageUrl!}/' + value +'" style="width:150px;height:auto" >'
+  }
+  
+  var selectedCommRows;
+  function confirm(){
+    selectedCommRows = $('#dg').datagrid('getChecked');
+  }
+  
+  function genClassifications() {
+
+      genClassification('classification', 'category_tree');
+      return true; 
+  }
+  
+  function genCatalogs() {
+	  
+	  genClassification('catalog', 'catalog_tree');
+      return true; 
+  }
+  
+  function genClassification(type, tree) {
+
+      var classifications = $('#'+tree).combotree('tree').tree('getChecked');
+      $('#'+type).val(classifications.map(function(item){
+				        return item['value'];
+				      }).join(','));
+  }
+  
+</script>

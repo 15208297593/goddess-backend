@@ -1,0 +1,8 @@
+admin.login.title                    = \u767b\u9646 | \u5973\u795E\u4E3B\u4E49
+admin.login.header                   = \u6b22\u8fce\u767b\u9646
+admin.login.tel                      = \u7528\u6237\u540D
+admin.login.password                 = \u5bc6\u7801
+admin.login.rememberMe               = \u8bb0\u4f4f\u6211
+admin.login.btn.login                = \u767b \u9646
+admin.login.btn.forgot               = \u5fd8\u8bb0\u5bc6\u7801\uff1f
+admin.login.message                  = \u8bf7\u8f93\u5165\u60a8\u7684\u7528\u6237\u540d\u548c\u5bc6\u7801

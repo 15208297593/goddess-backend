@@ -1,0 +1,202 @@
+<% var toolbar = { %> 
+    
+  <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-add" onclick="insertSysparam()">添加</a>
+  
+  <select id="category" class="easyui-combobox" name="category" style="width:100px;" editable="false" data-options="onChange:changeCategory,onLoadSuccess:initSysparams">
+    <option value="order_cancel_reason">取消订单理由</option>
+    <option value="order_return_reason">退货理由</option>
+  </select>
+<%};
+var dialog = { %> 
+
+<%};
+var datagrid = { %> 
+    <table id="sysparams">
+    </table>
+<%};
+var dlg_buttons = { %> 
+    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-cancel" onclick="javascript:$('#dlg').dialog('close')" style="width:90px">关闭</a>
+<%};
+var otherDialogs = { %> 
+<%};
+include("/listLayout.html",
+        {toolbar:toolbar,
+        dialog:dialog, 
+        datagrid:datagrid,
+        dlg_buttons:dlg_buttons,
+        otherDialogs:otherDialogs,
+        dialog_title:""}){}
+%>
+
+<script type="text/javascript">
+
+  $(function(){
+  });
+  
+  function initSysparams() {
+	  changeCategory($('#category').combobox("getValue"));
+  }
+  
+  function changeCategory(newVal, oldVal) {
+    $('#sysparams').datagrid({
+        title:'',
+        iconCls:'icon-edit',
+        width:450,
+        height:550,
+        singleSelect:true,
+        url:'${cxt!}/admin/sysparams/getSysparams/' + newVal,
+        columns:[[
+            {field:'code',title:'分类码',width:150,
+                editor:{
+                    type:'validatebox',
+                    options:{
+                        validType:'maxLength[50]'
+                    }
+                }
+            },
+            {field:'text',title:'描述',width:150,
+                editor:{
+                    type:'validatebox',
+                    options:{
+                        required:true,
+                        validType:'maxLength[128]'
+                    }
+                }
+            },
+            {field:'action',title:'操作',width:100,align:'center',
+                formatter:function(value,row,index){
+                    if (row.editing){
+                        var s = '<a href="#" onclick="saveSysparam(this,'+index+','+row.code+')">保存</a> ';
+                        var c = '<a href="#" onclick="cancelSysparam(this,'+index+')">取消</a>';
+                        return s+c;
+                    } else {
+                        var e = '<a href="#" onclick="editSysparam(this,'+index+')">编辑</a> ';
+                        var d = '<a href="#" onclick="deleteSysparam('+index+',\''+(row.code || '')+'\')">删除</a> ';
+                        return e+d;
+                    }
+                }
+            }
+        ]],
+        onBeforeEdit:function(index,row){
+            row.editing = true;
+            updateActions(index, row, 'sysparams');
+        },
+        onAfterEdit:function(index,row){
+            row.editing = false;
+            updateActions(index, row, 'sysparams');
+        },
+        onCancelEdit:function(index,row){
+            row.editing = false;
+            updateActions(index, row, 'sysparams');
+        }
+    });
+
+  };
+
+  function updateActions(index, row, table){
+    var targetTable = $('#dg');
+    if (table) targetTable = $('#' + table);
+    targetTable.datagrid('updateRow',{
+          index: index,
+          row: row ? row : {}
+      });
+  }
+  
+  function insertSysparam(){
+    var index = 0;
+    $('#sysparams').datagrid('insertRow', {
+        index: index,
+        row:{}
+    });
+    $('#sysparams').datagrid('selectRow',index);
+    $('#sysparams').datagrid('beginEdit',index);
+  }
+
+  function editSysparam(target, index){
+    $('#sysparams').datagrid('selectRow',index); 
+    $('#sysparams').datagrid('beginEdit', index);
+  }
+  
+  function deleteSysparam(index, code){
+    $.messager.confirm('确认','确认删除吗?',function(r){
+        if (r){
+            var text = '';
+            var category = $('#category').combobox("getValue");
+            if (category == 'highend_tags') {
+              $('#sysparams').datagrid('deleteRow', index);
+              text = $('#sysparams').datagrid('getRows').map(function(r){
+                return r.text;
+              }).join(',');
+            }
+            // 删除配饰
+            $.post('${cxt!}/admin/sysparams/deleteSysparams/',
+                {category: $('#category').combobox("getValue"),
+                code: code,
+                text: text}, 
+	            function(result){
+	              if (result.errorMsg){
+	                $.messager.alert( 'Error', result.errorMsg);
+	              } else {
+	                $('#sysparams').datagrid('reload');      // reload data
+	              }
+	            });
+        }
+    });
+  }
+  
+  function saveSysparam(target, index, code){
+
+    if ($('#sysparams').datagrid('validateRow', index)) {
+    	
+    	if (code && code.trim()) {
+	    	var r = $('#sysparams').datagrid('getRows').some(function(r) {
+	    		if ($('#sysparams').datagrid('getRowIndex', r) != index && r.code == code) {
+                  $.messager.alert('Error', '分类码【'+code+'】重复!');
+                  return true;
+	    		}
+	    		return false;
+	    	});
+    	}
+    	
+        $('#sysparams').datagrid('selectRow',index);
+        var row = $('#sysparams').datagrid('getSelected');
+        $('#sysparams').datagrid('endEdit', index);
+        
+        var text = row.text;
+        var code = row.code;
+        var category = $('#category').combobox("getValue");
+        if (category == 'highend_tags') {
+          text = $('#sysparams').datagrid('getRows').map(function(r){
+            return r.text;
+          }).join(',');
+          code = '';
+        }
+        
+        $.post('${cxt!}/admin/sysparams/'+ (row.category ? 'updateSysparams' : 'saveSysparams'),
+       		{category: category,
+        	 code: code,
+        	 text: text}, 
+       		function(result){
+                if (result.errorMsg){
+                  $.messager.alert('Error', result.errorMsg);
+                  $('#sysparams').datagrid('beginEdit', index);
+                } else {
+                  $('#sysparams').datagrid('reload');      // reload data
+                }
+            }
+          );
+    } else {
+        $('#sysparams').datagrid('beginEdit', index);
+    }
+  }
+  
+  function cancelSysparam(target,index){
+    $('#sysparams').datagrid('selectRow',index);
+    var row = $('#sysparams').datagrid('getSelected');
+    if (row.category) {
+	    $('#sysparams').datagrid('cancelEdit', index);
+    } else {
+	    $('#sysparams').datagrid('deleteRow', index);
+    }
+  }
+</script>

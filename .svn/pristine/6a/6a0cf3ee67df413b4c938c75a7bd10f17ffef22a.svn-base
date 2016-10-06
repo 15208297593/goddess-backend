@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<sql-statement namespace="manage.order">
+
+    <!-- 商品列表展示 -->
+    <sql id="splitPage">
+        <![CDATA[
+              FROM orders o,users u
+             WHERE o.payer_id = u.user_id
+               <% if(!isEmpty(order_date_from)){ %>
+                 AND o.order_date >= #'$order_date_from$'#
+               <% } %>
+               <% if(!isEmpty(order_date_to)){ %>
+                 AND o.order_date <= #'$order_date_to$'#
+               <% } %>
+               <% if(!isEmpty(internal_order_status)){ %>
+                 AND o.internal_order_status = #'$internal_order_status$'#
+               <% } %>
+               <% if(!isEmpty(cell_num)){ %>
+                 AND u.cell_num like #'%$cell_num$%'#
+               <% } %>
+               <% if(!isEmpty(order_id)){ %>
+                 AND o.order_id like #'%$order_id$%'#
+               <% } %>
+            ORDER BY o.order_date desc,o.internal_order_status asc
+        ]]>
+    </sql>
+    
+    <!-- 更新订单状态 -->
+    <sql id="updateOrderStatus">
+        <![CDATA[
+            UPDATE orders
+               SET order_status = ?,
+                   internal_order_status = ?
+             WHERE order_id = ?
+        ]]>
+    </sql>
+    
+    <!-- 更新订单生产商 -->
+    <sql id="updateOrderManufacturer">
+        <![CDATA[
+            UPDATE order_commodities
+               SET manufacturer_id = ?
+             WHERE order_id = ?
+        ]]>
+    </sql>
+    
+    <!-- 订单商品详情 -->
+    <sql id="getOrderCommodities">
+        <![CDATA[ 
+            SELECT oc.*,
+                   m.manufacturer_name,
+                   m.manufacturer_email
+              FROM order_commodities oc
+         LEFT JOIN manufacturer m
+                ON oc.manufacturer_id = m.manufacturer_id
+             WHERE oc.order_id = ?
+        ]]>
+    </sql>
+
+    <!-- 退货订单详情 -->
+    <sql id="getReturnOrder">
+        <![CDATA[ 
+            SELECT ro.refund_no,
+                   ro.apply_refund_fee,
+                   o.transaction_id,
+                   o.settle_trade_no,
+                   o.payment
+              FROM return_order ro, orders o
+             WHERE ro.order_id = o.order_id
+               AND ro.order_commodity_id = oc.order_commodity_id
+               AND ro.return_order_id = ?
+        ]]>
+    </sql>
+    
+    <!-- 取得某类生产商 -->
+    <sql id="getManufacturers">
+        <![CDATA[ 
+            SELECT *
+              FROM manufacturer
+        ]]>
+    </sql>
+    
+    <!-- 取得用户定制属性 -->
+    <sql id="getCustomizationPros">
+        <![CDATA[ 
+            SELECT *
+              FROM customization_properties
+             WHERE user_customization_id = ?
+        ]]>
+    </sql>
+
+    <!-- 取得高端定制 -->
+    <sql id="getHighendCustomization">
+        <![CDATA[ 
+            SELECT o.order_id,
+                   o.consignee_name,
+			       o.consignee_telephone,
+			       o.province_first_stage_name,
+			       o.address_city_second_stage_name,
+			       o.address_counties_third_stage_name,
+			       o.address_detail_info,
+			       o.message,
+			       oc.order_commodity_id,
+			       oc.commodity_pic,
+			       uc.user_customization_id,
+			       uc.user_id,
+			       uc.custome_pic,
+			       ifnull(uc.customize_des, o.message) as customize_des,
+			       uc.base_properties,
+			       uc.price,
+			       uc.logo_content,
+			       uc.customize_tags
+			  FROM orders o,
+			       order_commodities oc,
+			       user_customization uc
+			 WHERE o.order_id = oc.order_id
+			   AND oc.user_customization_id = uc.user_customization_id
+			   AND o.order_id = ?
+        ]]>
+    </sql>
+
+    <!-- 取得定制图片 -->
+    <sql id="getCustomizationPics">
+        <![CDATA[ 
+            SELECT *
+			  FROM customization_pic
+			 WHERE user_customization_id = ?
+			   AND pic_type = ?
+		  ORDER BY rank
+        ]]>
+    </sql>
+
+    <!-- 取得定制配饰 -->
+    <sql id="getCustomizationAccs">
+        <![CDATA[ 
+            SELECT *
+			  FROM customization_accessory
+			 WHERE user_customization_id = ?
+        ]]>
+    </sql>
+
+</sql-statement>

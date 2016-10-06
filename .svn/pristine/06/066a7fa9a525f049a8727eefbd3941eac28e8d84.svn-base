@@ -1,0 +1,77 @@
+package com.goddess.ec.manage.service;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.log4j.Logger;
+
+import com.goddess.ec.manage.common.SplitPage;
+import com.goddess.ec.manage.model.Commodity;
+import com.goddess.ec.manage.tools.ToolSqlFormatter;
+import com.goddess.ec.manage.tools.ToolSqlXml;
+import com.jfinal.plugin.activerecord.Db;
+import com.jfinal.plugin.activerecord.Record;
+
+public class CommodityService extends BaseService {
+
+    @SuppressWarnings("unused")
+    private static Logger log = Logger.getLogger(CommodityService.class);
+
+    public static final CommodityService service = new CommodityService();
+
+    /**
+     * 商品详情
+     * @param commodityId
+     * @return
+     */
+    public Commodity getCommodityById(int commodityId) {
+        return Commodity.dao.findById(commodityId);
+    }
+
+    /**
+     * 商品列表
+     * @param splitPage
+     */
+    public void getCommodities(SplitPage splitPage) {
+    	String select = "SELECT *";
+        splitPageBase(splitPage, select, "manage.commodity.splitPage");
+    }
+    
+    /**
+     * 商品图片
+     * @param commodityId
+     * @return
+     */
+    public List<Record> getCommodityPics(int commodityId) {
+    	return Db.find(ToolSqlXml.getSql("manage.commodity.getCommodityPics"), commodityId);
+    }
+    
+    /**
+     * 计算所有材料的加成价格
+     * @param propertyKey
+     * @return
+     */
+    public int getAdditionPrice(String propertyKey) {
+
+    	String[] proKey = propertyKey.substring(1, propertyKey.length()-1).split("_");
+    	String keys = ToolSqlFormatter.formatInPart(proKey.length);
+        Map<String, Object> queryParam = new HashMap<String, Object>();
+        queryParam.put("keys", keys);
+    	Record priceAddition = Db.findFirst(ToolSqlXml.getSql("manage.customize.getPriceAddition", queryParam), proKey);
+    	return priceAddition == null ? 0 : priceAddition.getBigDecimal("price_addition").intValue();
+    }
+    
+    /**
+     * 取得商品定制属性
+     * 
+     * @param userCustomizationId
+     * @param commodityId
+     * @return
+     */
+    public List<Record> getCommodityCustomizationProps(Integer userCustomizationId, Integer commodityId) {
+    	Map<String, Object> params = new HashMap<String, Object>();
+    	params.put("user_customization_id", userCustomizationId);
+        return Db.find(ToolSqlXml.getSql("manage.commodity.getCommodityCustomizationProps", params), userCustomizationId == null ? commodityId : userCustomizationId);
+    }
+}

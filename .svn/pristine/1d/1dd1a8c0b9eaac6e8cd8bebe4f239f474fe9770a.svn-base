@@ -1,0 +1,191 @@
+<% var toolbar = { %> 
+    
+  <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-add" onclick="insertAccessory()">添加</a>
+<%};
+var dialog = { %> 
+
+<%};
+var datagrid = { %> 
+    <table id="accessories">
+    </table>
+<%};
+var dlg_buttons = { %> 
+    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-cancel" onclick="javascript:$('#dlg').dialog('close')" style="width:90px">关闭</a>
+<%};
+var otherDialogs = { %> 
+<%};
+include("/listLayout.html",
+        {toolbar:toolbar,
+        dialog:dialog, 
+        datagrid:datagrid,
+        dlg_buttons:dlg_buttons,
+        otherDialogs:otherDialogs,
+        dialog_title:""}){}
+%>
+
+<script type="text/javascript">
+
+  $(function(){
+    $('#fm').attr('enctype', 'multipart/form-data');
+    
+    $('#accessories').datagrid({
+        title:'',
+        iconCls:'icon-edit',
+        width:550,
+        height:550,
+        singleSelect:true,
+        idField:'accessory_id',
+        url:'${cxt!}/admin/accessory/getAccessoriesByType/' + ${type},
+        columns:[[
+            {field:'accessory_id',title:'id',width:80},
+            {field:'accessory_price',title:'价格',width:150,
+                editor:{
+                    type:'validatebox',
+                    options:{
+                        validType:'integ'
+                    }
+                }
+            },
+            {field:'accessory_pic',title:'图片展示',width:200,
+                formatter:function(value, row, index){
+                  if (!value) value = "/default.jpg";
+                  value = value + "?t=" + new Date().getTime();
+                  return '<div style="float:left;padding:10px" class="pic"><input type="file" class="pic" name="accessory_pic_' + index + '" id="accessory_pic_' + index +
+                    '" contentEditable="false" accept="jpg/jpeg/gif" style="display:none" onchange="uploadFile(this)"/>'+
+                      '<img src="${imageUrl!}/'+ value +'" style="width:100px;" >'+
+                        '<a class="c6" style="margin-left:10px;display:none" href="javascript:void(0)" onclick="changeImg(this)" id="btnChangePic_'+index+'">更换</a></div>';
+                }
+            },
+            {field:'action',title:'操作',width:100,align:'center',
+                formatter:function(value,row,index){
+                    if (row.editing){
+                        var s = '<a href="#" onclick="saveAccessory(this,'+index+')">保存</a> ';
+                        var c = '<a href="#" onclick="cancelAccessory(this,'+index+')">取消</a>';
+                        return s+c;
+                    } else {
+                        var e = '<a href="#" onclick="editAccessory(this,'+index+')">编辑</a> ';
+                        var d = '<a href="#" onclick="deleteAccessory('+row.accessory_id+')">删除</a> ';
+                        return e+d;
+                    }
+                }
+            }
+        ]],
+        onBeforeEdit:function(index,row){
+            row.editing = true;
+            updateActions(index, row, 'accessories');
+            $("#btnChangePic_"+index).show();
+        },
+        onAfterEdit:function(index,row){
+            row.editing = false;
+            updateActions(index, row, 'accessories');
+        },
+        onCancelEdit:function(index,row){
+            row.editing = false;
+            updateActions(index, row, 'accessories');
+            $("#btnChangePic_"+index).hide();
+        }
+    });
+
+  });
+
+  function updateActions(index, row, table){
+    var targetTable = $('#dg');
+    if (table) targetTable = $('#' + table);
+    targetTable.datagrid('updateRow',{
+          index: index,
+          row: row ? row : {}
+      });
+  }
+  
+  function insertAccessory(){
+    var index = 0;
+    $('#accessories').datagrid('insertRow', {
+        index: index,
+        row:{}
+    });
+    $('#accessories').datagrid('selectRow',index);
+    $('#accessories').datagrid('beginEdit',index);
+  }
+
+  function editAccessory(target, index){
+    $('#accessories').datagrid('selectRow',index); 
+    $('#accessories').datagrid('beginEdit', index);
+  }
+  
+  function deleteAccessory(accessory_id){
+    $.messager.confirm('确认','确认删除吗?',function(r){
+        if (r){
+            // 删除配饰
+            $.get('${cxt!}/admin/accessory/deleteAccessory/' + accessory_id,
+            function(result){
+              if (result.errorMsg){
+                $.messager.alert( 'Error', result.errorMsg);
+              } else {
+                $('#accessories').datagrid('reload');      // reload data
+              }
+            },'json');
+        }
+    });
+  }
+  
+  function saveAccessory(target, index){
+
+    var row = $('#accessories').datagrid('getSelected');
+    if ($('#accessories').datagrid('validateRow', index)) {
+        var fd = new FormData();
+        $('#accessories').datagrid('selectRow',index);
+        var row = $('#accessories').datagrid('getSelected');
+        var inputFile = $("#accessory_pic_"+index);
+        var upFile = inputFile[0].files[0];
+        if (upFile) {
+            fd.append('file', upFile);
+        }
+        $('#accessories').datagrid('endEdit', index);
+
+        fd.append("accessory_id", row.accessory_id);
+        fd.append("accessory_price", row.accessory_price);
+        fd.append("accessory_type", ${type});
+        $.ajax({
+            url: '${cxt!}/admin/accessory/'+ (row.accessory_id ? 'updateAccessory' : 'saveAccessory'),
+            data: fd,
+            processData: false,
+            contentType: false,
+            type: 'POST',
+            success: function(result){
+                if (result.errorMsg){
+                  $.messager.alert('Error', result.errorMsg);
+                  $('#accessories').datagrid('beginEdit', index);
+                } else {
+                  $('#accessories').datagrid('reload');      // reload data
+                }
+            }
+          });
+    } else {
+        $('#accessories').datagrid('beginEdit', index);
+    }
+  }
+  
+  
+  function cancelAccessory(target,index){
+    $('#accessories').datagrid('selectRow',index);
+    var row = $('#accessories').datagrid('getSelected');
+    if (row.accessory_id) {
+      $('#accessories').datagrid('cancelEdit', index);
+    } else {
+      $('#accessories').datagrid('deleteRow', index);
+    }
+  }
+
+  function changeImg(obj) {
+    $(obj).siblings(":first").click();
+  }
+
+  function uploadFile(obj) {
+    var fi = obj.files[0];
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        $(obj).next().attr('src', e.target.result);
+    };
+    reader.readAsDataURL(fi);
+  }
+</script>

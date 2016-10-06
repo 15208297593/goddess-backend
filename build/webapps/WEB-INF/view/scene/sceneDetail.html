@@ -1,0 +1,256 @@
+<form id="scenefm" enctype='multipart/form-data' method="post" novalidate >
+    
+    <input type="hidden" name="scene_id" id="scene_id" value="${scene.scene_id!}"/>
+    <input type="hidden" name="related_id" id="related_id" value="${scene.related_id!}"/>
+    <input type="hidden" name="scene_commodities" id="scene_commodities" />
+    <div class="fitem">
+        <label>终端</label>
+        <label id="terminalLab"></label>
+        <input type="hidden" name="terminal" id="terminal" value="${scene.terminal!}" />
+    </div>
+    <div class="fitem">
+        <label>所在页面</label>
+        <label id="pageLab"></label>
+        <input type="hidden" name="page" id="page" value="${scene.page!}" />
+    </div>
+    <div class="fitem">
+        <label>所在页面位置</label>
+        <label id="locationLab"></label>
+        <input type="hidden" name="location" id="location" value="${scene.location!}" />
+    </div>
+    <div class="fitem">
+        <label>场景名称</label>
+        <input name="scene_name" class="easyui-textbox" data-options="validType:'maxLength[20]'" value="${scene.scene_name!}">
+    </div>
+    <div class="fitem">
+        <label>场景名称（英文）</label>
+        <input name="scene_name_ext" class="easyui-textbox" data-options="validType:'maxLength[20]'" value="${scene.scene_name_ext!}">
+    </div>
+    <div class="fitem" id="rankDiv">
+        <label>显示顺序</label>
+        <input id="rank" name="rank" class="easyui-textbox" required="true" data-options="validType:'range[1,255]'" value="${scene.rank!}">
+    </div>
+    <input id="rankHidden" type="hidden" name="rank" >
+    <div class="fitem">
+        <div class="float-left"><label>场景图片</label></div>
+        <div style="margin-left: 110px;">
+            <div style="float:left;padding:10px" class="pic">
+                <input type="file" id="scene_pic" name="scene_pic_file" contentEditable="false" accept="jpg/jpeg/gif" style="display:none" onchange="uploadFile(this)"/>
+                <img alt="" src='${imageUrl!}/${scene.scene_pic!"default.jpg"}' style="width:150px;height:auto" id="scene_pic_img" />
+            </div>
+            <a href="javascript:void(0)" class=" easyui-linkbutton c6" iconCls="icon-edit" style="margin:10px" onclick="changeImg(this)" id="btnChange">更改图片</a>
+            <input id="scene_pic_delete" type="hidden" name="scene_pic_delete" value="0">
+            <a href="javascript:void(0)" class=" easyui-linkbutton c6" iconCls="icon-edit" style="margin:10px" onclick="deleteImg()" id="btnChange">删除</a>
+        </div>
+    </div>
+    <div style="clear:both"></div>
+    <div class="fitem">
+        <label>跳转页面</label>
+    <% if(dest_editable) { %>
+        <select id="destination" name="destination" style="width:100px;" onchange="changeDest(this)">
+          <option value="1" ${scene.destination! == "1" ? "selected='selected'" : ""}>商品列表页</option>
+          <option value="2" ${scene.destination! == "2" ? "selected='selected'" : ""}>商品详情页</option>
+          <option value="3" ${scene.destination! == "3" ? "selected='selected'" : ""}>品牌页</option>
+        </select>
+        
+    <% } else { %>
+        <label>${destination_text!}</label>
+        <input id="destination" type="hidden" name="destination" value="${destination!}">
+    <% } %>
+    </div>
+    <div>
+        <div class="float-left" style="width:130px"><label>关联商品或品牌</label></div>
+        <div style="margin-left: 120px;" id="relateDiv">
+            
+        </div>
+    </div>
+</form>
+
+<script type="text/javascript">
+
+  $(function(){
+
+    var page = $("#tg").treegrid("getParent", node.id);
+    var terminal = $("#tg").treegrid("getParent", page.id);
+    $("#locationLab").html(node.name);
+    $("#pageLab").html(page.name);
+    $("#terminalLab").html(terminal.name);
+    var relate = node.relate;
+    if (relate == "commodities") {
+      selectCommodities();
+    } else if (relate == "brands") {
+      selectBrands();
+    } else {
+    	$("#destination").change();
+        var dest = $("#destination").val();
+        // 加载品牌
+        if (dest == "3") {
+            selectBrands();
+        } else {
+            selectCommodities();
+        }
+    }
+    if (multi) {
+    	$('#rankHidden').remove();
+    } else {
+    	$("#rankDiv").remove();
+        if (node.rank) {
+            $('#rankHidden').val(node.rank);
+        }
+    }
+  })
+  
+  function deleteImg() {
+    $.messager.confirm('删除场景图片','确定删除该场景图片吗?',function(r){
+        if (r){
+		    $("#scene_pic_delete").val("1");
+		    $("#scene_pic").val("");
+		    $("#scene_pic_img").attr('src', "${imageUrl!}/default.jpg");
+        }
+    });
+  }
+  
+  function changeImg(obj) {
+    $(obj).prev().children(":first").click();
+  }
+  
+  function uploadFile(obj) {
+    var fi = obj.files[0];
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        $(obj).next().attr('src', e.target.result);
+    };
+    reader.readAsDataURL(fi);
+  }
+  
+  function changeDest(obj) {
+	  var dest = $(obj).val();
+	  // 加载品牌
+	  if (dest == "3") {
+		  selectBrands();
+	  } else {
+		  selectCommodities();
+	  }
+  }
+
+  function selectCommodities() {
+    $('#relateDiv').html('<table id="commodityDg"></table>');
+    $('#commodityDg').datagrid({
+        title:'',
+        iconCls:'icon-edit',
+        width:600,
+        height:550,
+        singleSelect:true,
+        idField:'commodity_id',
+        url:'${cxt!}/admin/scene/getRelatedCommodities/${scene.scene_id!0}',
+        queryParams: {
+        },
+        columns:[[
+            {field:'is_selected',width:50,formatter:function(value, row, index){
+                return "<input name='scene_commodity_"+row.commodity_id+"' type='checkbox' " + 
+                       (("${scene.related_id!}" == row.commodity_id || value == "1") ? "checked='checked'" : "") + "value='" + row.commodity_id + "' />";
+            }},
+            {field:'commodity_id',title:'商品id',width:80},
+            {field:'commodity_name',title:'商品名称',width:150},
+            {field:'commodity_pic',title:'商品图片',width:150,formatter:formatPic},
+            {field:'shelve_date',title:'上架时间',width:150}
+        ]]
+    });
+  }
+
+  function selectBrands() {
+    $('#relateDiv').html('<table id="brandDg"></table>');
+    $('#brandDg').datagrid({
+        title:'',
+        iconCls:'icon-edit',
+        width:440,
+        height:550,
+        singleSelect:true,
+        idField:'brand_id',
+        url:'${cxt!}/admin/scene/getRelatedBrands/',
+        queryParams: {
+        },
+        columns:[[
+            {field:'action',width:50,formatter:function(value, row, index){
+                return "<input name='scene_brand_"+row.brand_id+"' type='checkbox' " + ("${scene.related_id!}" == row.brand_id ? "checked='checked'" : "") + "value='" + row.brand_id + "' />";
+            }},
+            {field:'brand_id',title:'品牌id',width:80},
+            {field:'brand_name',title:'品牌名称',width:150},
+            {field:'brand_logo',title:'品牌logo',width:150,align:'center',formatter:formatPic},
+        ]]
+    });
+  }
+  
+  function save() {
+    $('#scenefm').form('submit',{
+      url: '${cxt!}/admin/scene/'+ ('${scene.scene_id!}' ? 'updateScene' : 'saveScene') ,
+      onSubmit: function(){
+          return $(this).form('validate') && validate();
+      },
+      success: function(result){
+        var result = eval('('+result+')');
+        if (result.errorMsg){
+          $.messager.alert('Error', result.errorMsg);
+        } else {
+          $('#scenedlg').dialog('close');        // close the dialog
+          if (multi) $('#dg').datagrid('reload');  // reload the data
+        }
+      }
+    });
+  }
+  
+  function validate() {
+    var sceneId = $("#scene_id").val();
+    var limit = node.num || 0;
+    var rank = multi ? $('#rank').textbox('getValue') : "";
+  
+    if (multi && $('#dg').datagrid('getRows').some(function(r) {
+              if (r.scene_id != sceneId) {
+                  if (rank == r.rank) {
+                      $.messager.alert('Warning', '显示顺序【'+rank+'】重复!');
+                      return true;
+                  }
+              }
+              return false;
+          })) {
+        return false;
+    }
+    
+    var selected;
+    var dest = $("#destination").val();
+    // 品牌
+    if (dest == "3") {
+    	selected = $(":checkbox[name^='scene_brand_']:checked");
+    } else {
+    	selected = $(":checkbox[name^='scene_commodity_']:checked");
+    }
+    if (selected.length == 0) {
+        $.messager.alert('Warning', '至少关联一个!');
+        return false;
+    } 
+    // 关联数目限制
+    if (limit) {
+    	if (limit != selected.length) {
+	        $.messager.alert('Warning', '必须关联'+limit+'个!');
+	        return false;
+    	}
+    } else {
+    	// 商品列表
+    	if ($("#destination").val() != "1" && selected.length != 1) {
+	        $.messager.alert('Warning', '商品详情页，品牌页只能关联1个!');
+	        return false;
+    	}
+    }
+    if (dest != "1") {
+        $("#related_id").val($(selected[0]).val());
+    // 商品列表页
+    } else {
+        var idArr = []
+        selected.each(function() {
+            idArr.push($(this).val());
+        });
+        $('#scene_commodities').val(idArr.join("_"));
+    }
+    return true;
+  }
+</script>

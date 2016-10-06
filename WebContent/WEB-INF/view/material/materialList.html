@@ -1,0 +1,568 @@
+<% var toolbar = { %> 
+    
+  <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-add" onclick="insertType()">添加新类别</a>
+<%};
+var dialog = { %> 
+
+    <div class="fitem">
+        <label>类别</label>
+        <input id="type_name" name="type_name" class="easyui-textbox" readonly="true">
+    </div>
+    <div class="fitem">
+      <label >原材料</label>
+      <div style="margin-left:120px">
+        <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-add" onclick="insertMaterial()" style="margin-bottom:5px">添加新材料</a>
+        <table id="materials">
+        </table>
+      </div>
+    </div>
+    <input type="hidden" name="exhibition_type" id="exhibition_type" value="" />
+    <input type="hidden" name="material_type_id" id="material_type_id" value="" />
+<%};
+var datagrid = { %> 
+    <table id="dg">
+    </table>
+<%};
+var dlg_buttons = { %> 
+        <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-cancel" onclick="javascript:$('#dlg').dialog('close')" style="width:90px">关闭</a>
+<%};
+var otherDialogs = { %> 
+    <form id="submitForm" method="post" enctype="multipart/form-data" style="display:none">
+        <input type="hidden" name="material_id" id="material_id" value="" />
+        <input type="hidden" name="material_name" id="material_name" />
+        <input type="hidden" name="price_addition" id="price_addition" />
+        <input type="hidden" name="material_exhibition" id="material_exhibition" />
+    </form>
+<%};
+include("/listLayout.html",
+        {toolbar:toolbar,
+        dialog:dialog, 
+        datagrid:datagrid,
+        dlg_buttons:dlg_buttons,
+        otherDialogs:otherDialogs,
+        dialog_title:"原材料详情"}){}
+%>
+
+<script type="text/javascript">
+
+  $(function(){
+    $('#fm').attr('enctype', 'multipart/form-data');
+    
+    var exhibitionTypes = [{name:"颜色", value:0}, {name:"图片", value:1}, {name:"印花", value:2}];
+    var customizeExhibition = [{name:"否", value:1}, {name:"是", value:2}];
+    $('#dg').datagrid({
+        title:'',
+        iconCls:'icon-edit',
+        width:710,
+        height:250,
+        singleSelect:true,
+        idField:'material_type_id',
+        url:'${cxt!}/admin/material/getMaterialTypes',
+        columns:[[
+            {field:'material_type_id',title:'类别id',width:50},
+            {field:'type_name',title:'类别名称',width:110,
+              editor:{
+                type:'validatebox',
+                options:{
+                  required:true,
+                  validType:'maxLength[50]'
+                }
+              }
+            },
+            {field:'type_name_ext',title:'类别名称(英文)',width:120,
+              editor:{
+                type:'validatebox',
+                options:{
+                  required:true,
+                  validType:'maxLength[50]'
+                }
+              }
+            },
+            {field:'exhibition_type',title:'展示方式',width:100,
+                formatter:function(value){
+                    for(var i=0; i<exhibitionTypes.length; i++){
+                        if (exhibitionTypes[i].value == value) return exhibitionTypes[i].name;
+                    }
+                    return value;
+                },
+                editor:{
+                    type:'combobox',
+                    options:{
+                        valueField:'value',
+                        textField:'name',
+                        data:exhibitionTypes,
+                        required:true,
+                        editable:false
+                    }
+                }
+            },
+            {field:'customize_exhibition',title:'定制是否显示名称',width:120,
+                formatter:function(value){
+                    for(var i=0; i<customizeExhibition.length; i++){
+                        if (customizeExhibition[i].value == value) return customizeExhibition[i].name;
+                    }
+                    return value;
+                },
+                editor:{
+                    type:'combobox',
+                    options:{
+                        valueField:'value',
+                        textField:'name',
+                        data:customizeExhibition,
+                        editable:false
+                    }
+                }
+            },
+            {field:'delete_flag',title:'状态',width:50,formatter:function(value){
+                return value == '1' ? '已删除' : '正常';
+            }},
+            {field:'action',title:'操作',width:150,align:'center',
+                formatter:function(value,row,index){
+                    if (row.editing){
+                        var s = '<a href="#" onclick="saveType(this,'+index+')">保存</a> ';
+                        var c = '<a href="#" onclick="cancelType(this,'+index+')">取消</a> ';
+                        return s+c;
+                    } else {
+                        var e = '<a href="#" onclick="editType(this,'+index+')">编辑</a> ';
+                        var ed = '<a href="#" onclick="editDetail(this,'+index+')">编辑原材料</a> ';
+                        var d = '<a href="#" onclick="deleteType('+row.material_type_id+')">删除</a> ';
+                        var r = '<a href="#" onclick="recoverType('+row.material_type_id+')">恢复</a> ';
+                        return row.delete_flag == '1' ? r : e+ed+d;
+                    }
+                }
+            }
+        ]],
+        onBeforeEdit:function(index,row){
+            row.editing = true;
+            updateActions(index);
+        },
+        onAfterEdit:function(index,row){
+            row.editing = false;
+            //updateActions(index);
+        },
+        onEndEdit:function(index,row){
+            row.editing = false;
+            //updateActions(index);
+        },
+        
+        onCancelEdit:function(index,row){
+            row.editing = false;
+            updateActions(index);
+        }
+    });
+  });
+  
+
+  function updateActions(index, row, table){
+    var targetTable = $('#dg');
+    if (table) targetTable = $('#' + table);
+    targetTable.datagrid('updateRow',{
+          index: index,
+          row: row ? row : {}
+      });
+  }
+  
+  function getRowIndex(target){
+    var tr = $(target).closest('tr.datagrid-row');
+    return parseInt(tr.attr('datagrid-row-index'));
+  }
+  function editType(target, index){
+      $('#dg').datagrid('selectRow',index);
+      $('#dg').datagrid('beginEdit', index);
+  }
+
+  function recoverType(material_type_id) {
+    $.messager.confirm('确认','确认恢复这个类别吗?',function(r){
+        if (r){
+            // 删除类别
+            $.get('${cxt!}/admin/material/recoverMaterialType/' + material_type_id,
+            function(result){
+              if (result.errorMsg){
+                $.messager.alert( 'Error', result.errorMsg);
+              } else {
+                $('#dg').datagrid('reload');      // reload data
+              }
+            },'json');
+        }
+    });
+  }
+  function deleteType(material_type_id){
+    //$('#dg').datagrid('selectRow',index);
+    //var row = $('#dg').datagrid('getSelected');
+    $.messager.confirm('删除类别','该类别下的所有原材料也将不可用，确定删除该类别吗?',function(r){
+        if (r){
+            checkUpdate(true,'checkUpdateMaterialType/'+material_type_id,',仍然删除吗?',function() {
+	            // 删除类别
+	            $.get('${cxt!}/admin/material/deleteMaterialType/' + material_type_id, function(result){
+	              if (result.errorMsg){
+	                $.messager.alert( 'Error', result.errorMsg);
+	              } else {
+	                $('#dg').datagrid('reload');  // reload data
+	              }
+	            },'json');
+            });
+        }
+    });
+  }
+  function saveType(target,index){
+    // ajax保存
+    $('#dg').datagrid('selectRow',index);
+    var row = $('#dg').datagrid('getSelected');
+    if ($('#dg').datagrid('validateRow', index) && validateTypeName(index) && validateExhibitionType(index)) {
+      if (row.material_type_id) {
+          checkUpdate(true,'checkUpdateMaterialType/'+row.material_type_id,',仍然更新吗?',function() {
+              $('#dg').datagrid('endEdit', index);
+              // 更新类别
+              $.post('${cxt!}/admin/material/updateMaterialType',
+                  {material_type_id:row.material_type_id,
+                   type_name:row.type_name,
+                   type_name_ext:row.type_name_ext,
+                   exhibition_type:row.exhibition_type,
+                   customize_exhibition:row.customize_exhibition},function(result){
+                if (result.errorMsg){
+                  $.messager.alert( 'Error', result.errorMsg);
+                  $('#dg').datagrid('beginEdit', index);
+                } else {
+                  $('#dg').datagrid('reload');  // reload data
+                }
+              },'json');
+          }, function(){$('#dg').datagrid('cancelEdit', index);});
+      } else {
+        $('#dg').datagrid('endEdit', index);
+        // 添加新类别
+        $.post('${cxt!}/admin/material/saveMaterialType',
+            {type_name:row.type_name,
+             type_name_ext:row.type_name_ext,
+             exhibition_type:row.exhibition_type,
+             customize_exhibition:row.customize_exhibition},function(result){
+          if (result.errorMsg){
+            $.messager.alert( 'Error', result.errorMsg);
+            $('#dg').datagrid('beginEdit', index);
+          } else {
+            $('#dg').datagrid('reload');      // reload data
+          }
+        },'json');
+      }
+    }
+  }
+  
+  function cancelType(target,index){
+    $('#dg').datagrid('selectRow',index);
+    var row = $('#dg').datagrid('getSelected');
+    if (row.material_type_id) {
+      $('#dg').datagrid('cancelEdit', index);
+    } else {
+      $('#dg').datagrid('deleteRow', index);
+    }
+  }
+
+  function insertType(){
+    var index = 0;
+    $('#dg').datagrid('insertRow', {
+        index: index,
+        row:{exhibition_type:0,customize_exhibition:1}
+    });
+    $('#dg').datagrid('selectRow',index);
+    $('#dg').datagrid('beginEdit',index);
+  }
+  
+  function validateTypeName(index) {
+    var rows = $('#dg').datagrid("getRows");
+    var typeName = $("tr[datagrid-row-index="+index+"] td[field=type_name] .datagrid-editable-input").val();
+      return rows.every(function(r, i) {
+          if (i != index && typeName == r.type_name) {
+              $.messager.alert( 'Error', "类别名称【"+typeName+"】已存在！");
+              $('#dg').datagrid('beginEdit', index);
+              return false;
+          }
+          return true;
+      });
+  }
+  
+  function validateExhibitionType(index) {
+
+    var rows = $('#dg').datagrid("getRows");
+    var exhibition_type = $("tr[datagrid-row-index="+index+"] td[field=exhibition_type] input[type=hidden]").val();
+    //var name = $("tr[datagrid-row-index="+0+"] td[field=exhibition_type] .combo input[type=text]").prop('value');
+      return rows.every(function(r, i) {
+          if (i != index && exhibition_type != 1 && exhibition_type == r.exhibition_type) {
+              $.messager.alert( 'Error', "颜色，印花分别只能有一种！");
+              $('#dg').datagrid('beginEdit', index);
+              return false;
+          }
+          return true;
+      });
+  }
+  
+  function checkUpdate(needCheck, url,alert, confirmAction, cancelAction) {
+
+	  if (!needCheck) {
+		  confirmAction.call();
+		  return;
+	  }
+      $.get('${cxt!}/admin/material/'+url,function(result){
+        if (result.errorMsg){
+          $.messager.confirm('Confirm', result.errorMsg+alert,function(r){
+              if (r) {
+            	  confirmAction.call();
+              } else if (cancelAction) {
+            	  cancelAction.call();
+              }
+          });
+        } else {
+        	confirmAction.call();
+        }
+      },'json');
+  }
+
+  function insertMaterial(){
+    var index = 0;
+    $('#materials').datagrid('insertRow', {
+        index: index,
+        row:{}
+    });
+    $('#materials').datagrid('selectRow',index);
+    $('#materials').datagrid('beginEdit',index);
+  }
+  
+  function editDetail(target,index) {
+    
+    $('#dg').datagrid('selectRow',index);
+    var row = $('#dg').datagrid('getSelected');
+    var exhibitionType = row.exhibition_type;
+
+    $('#fm').form('clear');
+    $('#fm').form('load',row);
+    
+    var material_exhibition;
+    // 颜色值展示
+    if (exhibitionType+"" == "0") {
+        material_exhibition = {field:'material_exhibition',title:'原材料展示',width:200,
+                formatter:function(value){
+                    // 颜色值展示
+                    return "<div class='box' style='background-color:"+value+";'></div>";
+                },
+                editor:{
+                    type:'validatebox',
+                    options:{
+                        required:true,
+                        validType:'maxLength[100]'
+                    }
+                }
+            };
+    // 图片展示,印花
+    } else {
+        material_exhibition = {field:'material_exhibition',title:'原材料展示',width:200,
+                formatter:function(value, row, index){
+                  if (!value) value = "/default.jpg";
+                  value = value + "?t=" + new Date().getTime();
+                  return '<div style="float:left;padding:10px" class="pic"><input type="file" class="pic" name="material_pic_' + index + '" id="material_pic_' + index +
+                    '" contentEditable="false" accept="jpg/jpeg/gif" style="display:none" onchange="uploadFile(this)"/>'+
+                      '<img src="${imageUrl!}/'+ value +'" style="width:100px;" >'+
+                        '<a class="c6" style="margin-left:10px;display:none" href="javascript:void(0)" onclick="changeImg(this)" id="btnChangePic_'+index+'">更换</a></div>';
+                }
+            };
+    }
+    $('#materials').datagrid({
+        title:'',
+        iconCls:'icon-edit',
+        width:750,
+        height:550,
+        singleSelect:true,
+        idField:'material_id',
+        url:'${cxt!}/admin/material/getMaterials/' + row.material_type_id,
+        columns:[[
+            {field:'material_id',title:'原材料id',width:80},
+            {field:'material_name',title:'原材料名称',width:150,
+                editor:{
+                    type:'validatebox',
+                    options:{
+                        validType:'maxLength[50]'
+                    }
+                }
+            },{field:'price_addition',title:'价格加成',width:150,
+                editor:{
+                    type:'validatebox',
+                    options:{
+                        validType:'integ'
+                    }
+                }
+            },
+            material_exhibition,
+            {field:'delete_flag',title:'状态',width:50,formatter:function(value){
+            	return value == '1' ? '已删除' : '正常';
+            }},
+            {field:'action',title:'操作',width:100,align:'center',
+                formatter:function(value,row,index){
+                    if (row.editing){
+                        var s = '<a href="#" onclick="saveMaterial(this,'+index+')">保存</a> ';
+                        var c = '<a href="#" onclick="cancelMaterial(this,'+index+')">取消</a>';
+                        return s+c;
+                    } else {
+                        var e = '<a href="#" onclick="editMaterial(this,'+index+')">编辑</a> ';
+                        var d = '<a href="#" onclick="deleteMaterial('+row.material_type_id+','+row.material_id+')">删除</a> ';
+                        var r = '<a href="#" onclick="recoverMaterial('+row.material_id+')">恢复</a> ';
+                        return row.delete_flag == '1' ? r : e+d;
+                    }
+                }
+            }
+        ]],
+        onBeforeEdit:function(index,row){
+            row.editing = true;
+            updateActions(index, row, 'materials');
+            $("#btnChangePic_"+index).show();
+        },
+        onAfterEdit:function(index,row){
+            row.editing = false;
+            updateActions(index, row, 'materials');
+        },
+        onCancelEdit:function(index,row){
+            row.editing = false;
+            updateActions(index, row, 'materials');
+            $("#btnChangePic_"+index).hide();
+        }
+    });
+
+    $('#dlg').dialog('open').dialog('setTitle','');
+  }
+
+  function editMaterial(target, index){
+    $('#materials').datagrid('selectRow',index); 
+    $('#materials').datagrid('beginEdit', index);
+  }
+  
+  function recoverMaterial(material_id) {
+    $.messager.confirm('确认','确认恢复这个原材料吗?',function(r){
+        if (r){
+            $.get('${cxt!}/admin/material/recoverMaterial/' + material_id,
+            function(result){
+              if (result.errorMsg){
+                $.messager.alert( 'Error', result.errorMsg);
+              } else {
+                $('#materials').datagrid('reload');      // reload data
+              }
+            },'json');
+        }
+    });
+  }
+  
+  function deleteMaterial(material_type_id, material_id){
+    $.messager.confirm('确认','确认删除这个原材料吗?',function(r){
+        if (r){
+            checkUpdate(true,'checkUpdateMaterial/'+material_id,',仍然删除吗?',function() {
+                // 删除原材料
+                $.get('${cxt!}/admin/material/deleteMaterial/' + material_id+'-'+material_type_id,
+                function(result){
+                  if (result.errorMsg){
+                    $.messager.alert( 'Error', result.errorMsg);
+                  } else {
+                    $('#materials').datagrid('reload');      // reload data
+                  }
+                },'json');
+            });
+        }
+    });
+  }
+  
+  function saveMaterial(target, index){
+
+    var row = $('#materials').datagrid('getSelected');
+    if ($('#materials').datagrid('validateRow', index)) {
+        checkUpdate(row.material_id,'checkUpdateMaterial/'+row.material_id,',仍然更新吗?', function(){
+            var fd = new FormData();
+            $('#materials').datagrid('selectRow',index);
+            var row = $('#materials').datagrid('getSelected');
+            if ($("#exhibition_type").val() != "0") {
+              var inputFile = $("#material_pic_"+index);
+              var upFile = inputFile[0].files[0];
+              if (upFile) {
+                  fd.append('file', upFile);
+              }
+            }
+            $('#materials').datagrid('endEdit', index);
+
+            fd.append("material_id", row.material_id);
+            fd.append("material_name", row.material_name);
+            fd.append("price_addition", row.price_addition);
+            fd.append("material_type_id",$("#material_type_id").val());
+            fd.append("exhibition_type",$("#exhibition_type").val());
+            if ($("#exhibition_type").val() == "0") {
+                fd.append("material_exhibition", row.material_exhibition);
+            }
+            $.ajax({
+                url: '${cxt!}/admin/material/'+ (row.material_id ? 'updateMaterial' : 'saveMaterial'),
+                data: fd,
+                processData: false,
+                contentType: false,
+                type: 'POST',
+                success: function(result){
+                    if (result.errorMsg){
+                      $.messager.alert('Error', result.errorMsg);
+                      $('#materials').datagrid('beginEdit', index);
+                    } else {
+                      $('#materials').datagrid('reload');      // reload data
+                    }
+                }
+              });
+        }, function(){$('#materials').datagrid('cancelEdit', index);});
+    } else {
+        $('#materials').datagrid('beginEdit', index);
+    }
+  }
+  
+  
+  function cancelMaterial(target,index){
+    $('#materials').datagrid('selectRow',index);
+    var row = $('#materials').datagrid('getSelected');
+    if (row.material_id) {
+      $('#materials').datagrid('cancelEdit', index);
+    } else {
+      $('#materials').datagrid('deleteRow', index);
+    }
+  }
+
+  function changeImg(obj) {
+    $(obj).siblings(":first").click();
+  }
+
+  function uploadFile(obj) {
+    var fi = obj.files[0];
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        $(obj).next().attr('src', e.target.result);
+    };
+    reader.readAsDataURL(fi);
+  }
+  
+  function createSubmitForm(row) {
+    $("#material_id").val(row.material_id);
+    $("#material_name").val(row.material_name);
+    $("#price_addition").val(row.price_addition);
+    if ($("#exhibition_type").val() != "0") {
+        $("#material_exhibition").val(row.material_exhibition);
+    }
+  }
+
+  function submitForm(url, index, row){
+    createSubmitForm(row);
+    $('#submitForm').form('submit',{
+      url: url,
+      onSubmit: function(){
+        return true;
+      },
+      success: function(result){
+        var result = eval('('+result+')');
+        if (result.errorMsg){
+          $.messager.alert('Error', result.errorMsg);
+          $('#materials').datagrid('beginEdit', index);
+        } else {
+          $("#material_pic_"+index).remove();
+          row.material_exhibition = result.material.material_exhibition;
+          row.material_id = result.material.material_id;
+          updateActions(index, row, 'materials');
+          $('#materials').datagrid('unselectRow', index);
+        }
+      }
+    });
+  }
+</script>

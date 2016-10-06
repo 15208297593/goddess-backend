@@ -1,0 +1,61 @@
+#fm{
+  margin:0;
+  padding:10px 30px;
+}
+.ftitle{
+  font-size:14px;
+  font-weight:bold;
+  padding:5px 0;
+  margin-bottom:10px;
+  border-bottom:1px solid #ccc;
+}
+.fitem{
+  margin-bottom:10px;
+}
+.fitem label{
+  display:inline-block;
+  width:120px;
+}
+.fitem input{
+  width:160px;
+}
+.fitem input[type="radio"] {
+  width: 20px;
+}
+.float-left {
+  float:left
+}
+.float-right {
+  float:right
+}
+.sub-panel {
+  padding:10px;
+}
+
+.text-right {
+  text-align:right;
+}
+
+.box {
+    border: 1px solid #ccc;
+    padding: 2px;
+    width:30px;
+    height:30px;
+    margin:5px
+}
+.large-box {
+    border: 1px solid #ccc;
+    padding: 2px;
+    width:40px;
+    height:40px;
+    margin:5px
+}
+span.break-line {word-break:normal; width:auto; display:block; white-space:pre-wrap;word-wrap : break-word ;overflow: hidden ;} 
+
+.select_text {
+	margin-right:10px;
+	border-style: dotted;
+	border-width: 1px;
+	width: 80px;
+	text-align: center;
+}

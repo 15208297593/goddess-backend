@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<sql-statement namespace="manage.commodity">
+
+    <!-- 商品列表展示 -->
+    <sql id="splitPage">
+        <![CDATA[
+              FROM commodities
+             WHERE 1 = 1
+	           <% if(!isEmpty(is_shelved)){ %>
+                 AND is_shelved = #$is_shelved$#
+	           <% } %>
+               <% if(!isEmpty(is_customizable)){ %>
+                  <% if(is_customizable == "1"){ %>
+                     AND prototype_id IS NOT NULL
+                   <% } else { %>
+                     AND prototype_id IS NULL
+                   <% } %>
+               <% } %>
+	           <% if(!isEmpty(commodity_source)){ %>
+                 AND commodity_source = #$commodity_source$#
+	           <% } %>
+	      ORDER BY shelve_date DESC
+        ]]>
+    </sql>
+
+    <sql id="getCommodityPics">
+        <![CDATA[
+            SELECT * 
+              FROM commodity_pic 
+             WHERE commodity_id = ? 
+          ORDER BY pic_type,rank
+        ]]>
+    </sql>
+
+    <sql id="getScCommodity">
+        <![CDATA[
+            select u.user_id,
+                   u.cell_num,
+                   u.nick_name
+              from shopping_cart sc, users u
+             where sc.user_id = u.user_id
+               and commodity_id = ? 
+             limit 1
+        ]]>
+    </sql>
+
+    <sql id="getUnpaidCommodity">
+        <![CDATA[
+            select o.order_id,
+                   o.payer_id, 
+                   u.cell_num,
+                   u.nick_name
+              from orders o, order_commodities oc, users u 
+             where o.order_id = oc.order_id 
+               and o.payer_id = u.user_id
+               and o.order_status = ? 
+               and oc.commodity_id = ? 
+             limit 1
+        ]]>
+    </sql>
+    
+    <sql id="getCommodityCustomizationProps">
+        <![CDATA[
+            SELECT mt.type_name,
+                   mt.type_name_ext,
+                   mt.exhibition_type,
+                   m.material_name,
+                   m.material_exhibition
+              FROM customization_properties cp,material_type mt,materials m
+             WHERE cp.material_type_id = mt.material_type_id
+               AND cp.material_id = m.material_id
+           <% if(!isEmpty(user_customization_id)){ %>
+               AND cp.user_customization_id = ?
+           <% } else { %>
+               AND cp.commodity_id = ?
+           <% } %>
+          ORDER BY cp.material_type_id
+        ]]>
+    </sql>
+
+    <sql id="getCommodityCatalog">
+        <![CDATA[
+            SELECT c.*,
+			       cc.commodity_id
+			  FROM commodity_catalog cc,
+			       catalog c
+			 WHERE cc.catalog_id = c.catalog_id
+			   AND cc.commodity_id = ?
+        ]]>
+    </sql>
+
+    <sql id="deleteCatalogByCommodity">
+        <![CDATA[
+            DELETE 
+			  FROM commodity_catalog
+			 WHERE commodity_id = ?
+        ]]>
+    </sql>
+
+    <sql id="addCommodityCatalog">
+        <![CDATA[
+            INSERT INTO commodity_catalog (commodity_id, catalog_id)
+                 VALUES (?, ?)
+        ]]>
+    </sql>
+    
+    <sql id="getCommodityClassification">
+        <![CDATA[
+            SELECT c.*
+			  FROM commodity_classification cc,
+                   classification c
+             WHERE cc.classification_id = c.classification_id
+			   AND cc.commodity_id = ?
+        ]]>
+    </sql>
+
+    <sql id="deleteClassificationByCommodity">
+        <![CDATA[
+            DELETE 
+			  FROM commodity_classification
+			 WHERE commodity_id = ?
+        ]]>
+    </sql>
+
+    <sql id="addCommodityClassification">
+        <![CDATA[
+            INSERT INTO commodity_classification (commodity_id, classification_id, brand_id, category)
+                 VALUES (?, ?, ?, ?)
+        ]]>
+    </sql>
+
+    <sql id="updateClassificationBrand">
+        <![CDATA[
+            UPDATE commodity_classification 
+               SET brand_id = ?
+             WHERE commodity_id = ?
+        ]]>
+    </sql>
+    
+</sql-statement>

@@ -1,0 +1,156 @@
+<% var toolbar = { %> 
+  <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-add" onclick="addBrand()">添加新品牌</a>
+<%};
+var datagrid = { %> 
+    <table id="dg" title="" class="easyui-datagrid" style="width:820px;height:600px"
+        url="${cxt!}/admin/brand/listBrands"
+        toolbar="#toolbar" pagination="true"
+        rownumbers="false" singleSelect="true">
+	    <thead>
+	        <tr>
+	            <th field="brand_id" width="60" align='center'>品牌ID</th>
+	            <th field="brand_name" width="100">品牌名称</th>
+	            <th field="brand_initial" width="100">品牌名称</th>
+	            <th field="brand_logo" width="150" formatter="formatPic" align='center'>品牌图片</th>
+	            <th field="brand_des" width="250">品牌描述</th>
+	            <th field="action" width="150" formatter="actions" align='center'>操作</th>
+	        </tr>
+	    </thead>
+    </table>
+<%};
+var dialog = { %> 
+<%};
+var otherDialogs = { %> 
+<%};
+var dlg_buttons = { %> 
+    <a href="javascript:void(0)" class="easyui-linkbutton c6" iconCls="icon-ok" onclick="save()" style="width:90px">保存</a>
+    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-cancel" onclick="javascript:$('#dlg').dialog('close')" style="width:90px">取消</a>
+<%};
+include("/listLayout.html",
+        {toolbar:toolbar,
+        datagrid:datagrid, 
+        dialog:dialog, 
+        dlg_buttons:dlg_buttons,
+        otherDialogs:otherDialogs,
+        dialog_title:"品牌编辑"}){}
+%>
+
+<script type="text/javascript">
+
+  $(function(){
+  });
+  
+  function formatPic(value, row, index) {
+	  if (!value) value="default.jpg";
+	  return '<img src="${imageUrl!}/' + value +'" style="width:150px;height:auto;padding:5px" >'
+  }
+  
+  function actions(value, row, index) {
+	  
+      var e = '<a href="#" onclick="editBrand('+row.brand_id+')">编辑品牌</a><br/> ';
+      var c = '<a href="#" onclick="destroyBrand('+row.brand_id+')">删除品牌</a><br/> ';
+      if (row.delete_flag == '0')
+        return e+c;
+  }
+  
+
+  function changeImg(obj) {
+    $(obj).prev().children(":first").click();
+  }
+
+  function uploadFile(obj) {
+    var fi = obj.files[0];
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        $(obj).next().attr('src', e.target.result);
+    };
+    reader.readAsDataURL(fi);
+  }
+
+  var url;
+  function addBrand(){
+
+    $('#dlg').dialog({
+        closed: false,
+        cache: false,
+        title: "编辑品牌",
+        href:"${cxt!}/admin/brand/initBrand/"
+    });
+    url = '${cxt!}/admin/brand/saveBrand';
+  }
+  
+  function editBrand(id){
+
+    url = '${cxt!}/admin/brand/updateBrand';
+    $('#dlg').dialog({
+        closed: false,
+        cache: false,
+        title: "品牌更新",
+        href:"${cxt!}/admin/brand/getBrand/"+id
+    });
+  }
+
+  function checkUpdate(needCheck, checkType, id, alert, action) {
+
+	  if (!needCheck) {
+		  action.call();
+		  return;
+	  }
+      $.get('${cxt!}/admin/brand/'+checkType+'/'+id,function(result){
+        if (result.errorMsg){
+          $.messager.confirm('Confirm', result.errorMsg+alert,function(r){
+              if (r) action.call();
+          });
+        } else {
+        	action.call();
+        }
+      },'json');
+  }
+  
+  function destroyBrand(brand_id){
+
+    $.messager.confirm('Confirm', '确认删除该品牌吗?',function(r){
+    	if (r) {
+		    //checkUpdate(true, 'checkUpdateBrand', brand_id,',仍然删除吗?', function(){
+		    	$.get('${cxt!}/admin/brand/deleteBrand/'+brand_id,function(result){
+		          if (result.errorMsg){
+		            $.messager.alert( 'Error', result.errorMsg);
+		          } else {
+		            $('#dg').datagrid('reload');
+		          }
+		        },'json');
+		    //});
+    	}
+    });
+  }
+  
+  function save(){
+    if (!validateForm()) return false;
+    var brandId = $("#dlg_brand_id").val();
+    submitForm();
+    //checkUpdate(brandId, 'checkUpdateBrand', brandId, ',仍然更新吗?', submitForm);
+  }
+  
+  function validateForm() {
+      return $('#fm').form('validate');
+  }
+  
+  function submitForm() {
+    $('#fm').form('submit',{
+      url: url,
+      onSubmit: function(){
+    	  return true;
+      },
+      success: function(result){
+        var result = eval('('+result+')');
+        if (result.errorMsg){
+          $.messager.alert('Error', result.errorMsg);
+        } else {
+          $('#dlg').dialog('close');        // close the dialog
+          $('#dg').datagrid('reload');  // reload the data
+        }
+      }
+    });
+  }
+  
+</script>

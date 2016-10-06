@@ -1,0 +1,52 @@
+<div class="sub-panel">
+    <form id="searchForm" method="post" novalidate>
+		<% for(type in properties) {%>
+		    <div>
+	          <div class="float-left"><label style="width:70px;font: bold; font-size: 15px">${type.type_name}</label></div>
+	          <div style="margin-left: 110px;margin-bottom:5px" id="div_${type.material_type_id}">
+		          <div>全选<input type="checkbox" id="allProperties_${type.material_type_id}" name="allProperties_${type.material_type_id}" onclick="checkAll(this,${type.material_type_id})"></div>
+	              <% for(p in type.props) {%>
+					  <div class="float-left" style="text-align:left;margin-right:10px;margin-bottom:10px">
+			            <div style="text-align:center;">
+					        <% if(type.exhibition_type == "0") { %>
+					          <div class='box' style='background-color:${p.material_exhibition}'></div>
+				   			<% } else { %>
+				  		      <div class=''><img src="${imageUrl!}/${p.material_exhibition}" style="width:100px;" /></div>
+							<% }%>
+			                <input type="checkbox" onclick="selectProperty(this,${type.material_type_id})" id="material_id_${type.material_type_id}_${p.material_id!}" name="material_id_${type.material_type_id}_${p.material_id!}" value="_${type.material_type_id}@${p.material_id!}" />
+	                        <div>${p.material_name!}</div>
+			            </div>
+				      </div>
+	              <% }%>
+		       </div>
+    	    </div>
+    	    <div style="clear:both"></div>
+    	    <hr/>
+		<% }%>
+		<input type="hidden" id="prototype_id" name="prototype_id" value="${prototype_id}" />
+	</form>
+    <div id="commoditydlg" class="easyui-dialog" style="width:1000px;height:800px;padding:10px 20px" closed="true" buttons="#commoditydlg_buttons">
+    </div>
+    <div id="commoditydlg_buttons">
+	    <a href="javascript:void(0)" class="easyui-linkbutton c6" iconCls="icon-ok" onclick="shelve()" style="width:90px">保存</a>
+	    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-cancel" onclick="javascript:$('#commoditydlg').dialog('close')" style="width:90px">取消</a>
+    </div>
+</div>
+<script type="text/javascript">
+
+	$(function() {
+	})
+    var typeAndMaterial = eval(${typeAndMaterial});
+    function checkAll(obj, material_type_id) {
+    	$("#div_" + material_type_id + " :checkbox[name^='material_id_']").prop("checked", $(obj).is(":checked"));
+    }
+    
+    function selectProperty(obj, material_type_id) {
+    	$("#allProperties_"+material_type_id).prop("checked", $("#div_" + material_type_id + " :checkbox[name^='material_id_']").toArray().every(function(item, index) {
+    		if (!$(item).is(":checked")) {
+    			return false;
+    		}
+    		return true;
+    	}));
+    }
+</script>

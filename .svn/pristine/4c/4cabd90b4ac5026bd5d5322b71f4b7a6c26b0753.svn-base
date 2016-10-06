@@ -1,0 +1,294 @@
+<% var toolbar = { %> 
+  <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-add" onclick="addPrototype()">添加新基础款</a>
+<%};
+var datagrid = { %> 
+    <table id="dg" title="" class="easyui-datagrid" style="width:820px;height:600px"
+        url="${cxt!}/admin/prototype/listPrototypes"
+        toolbar="#toolbar" pagination="true"
+        rownumbers="false" singleSelect="true">
+	    <thead>
+	        <tr>
+	            <th field="prototype_id" width="60" align='center'>基础款ID</th>
+	            <th field="prototype_name" width="100">基础款名称</th>
+	            <th field="prototype_pic" width="150" formatter="formatPic" align='center'>基础款图片</th>
+	            <th field="prototype_des" width="250">基础款描述</th>
+	            <th field="base_price" width="80" align='center'>基础价格</th>
+	            <th field="action" width="150" formatter="actions" align='center'>操作</th>
+	        </tr>
+	    </thead>
+    </table>
+<%};
+var dialog = { %> 
+<%};
+var otherDialogs = { %> 
+    
+    <div id="otherdlg" class="easyui-dialog" style="width:1000px;height:600px;padding:10px 20px" closed="true" buttons="#othderDlgButtons">
+        <form id="propertyForm" method="post" novalidate>
+            <input type="hidden" name="prototype_id" id="prototype_id" />
+            <div class="easyui-layout" id="prototypeLayout" style="height:1120px">
+	        </div>
+        </form>
+    </div>
+    <div id="othderDlgButtons">
+        <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-cancel" onclick="javascript:$('#otherdlg').dialog('close')" style="width:90px">关闭</a>
+    </div>
+<%};
+var dlg_buttons = { %> 
+    <a href="javascript:void(0)" class="easyui-linkbutton c6" iconCls="icon-ok" onclick="save()" style="width:90px">保存</a>
+    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-cancel" onclick="javascript:$('#dlg').dialog('close')" style="width:90px">取消</a>
+<%};
+include("/listLayout.html",
+        {toolbar:toolbar,
+        datagrid:datagrid, 
+        dialog:dialog, 
+        dlg_buttons:dlg_buttons,
+        otherDialogs:otherDialogs,
+        dialog_title:"基础款编辑"}){}
+%>
+
+<script type="text/javascript">
+
+  $(function(){
+  });
+  
+  function formatPic(value, row, index) {
+	  if (!value) value="default.jpg";
+	  return '<img src="${imageUrl!}/' + value +'" style="width:150px;height:auto;padding:5px" >'
+  }
+  
+  function actions(value, row, index) {
+	  
+      var e = '<a href="#" onclick="editPrototype('+row.prototype_id+')">编辑基础款</a><br/> ';
+      var c = '<a href="#" onclick="destroyPrototype('+row.prototype_id+')">删除基础款</a><br/> ';
+      var ep = '<a href="#" onclick="editProperties('+row.prototype_id+')">编辑基础款属性</a> ';
+      if (row.delete_flag == '0')
+        return e+c+ep;
+  }
+  
+
+  function changeImg(obj) {
+    $(obj).prev().children(":first").click();
+  }
+
+  function uploadFile(obj) {
+    var fi = obj.files[0];
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        $(obj).next().attr('src', e.target.result);
+    };
+    reader.readAsDataURL(fi);
+  }
+
+  var url;
+  function addPrototype(){
+
+    $('#dlg').dialog({
+        closed: false,
+        cache: false,
+        title: "编辑基础款",
+        href:"${cxt!}/admin/prototype/initPrototype/"
+    });
+    url = '${cxt!}/admin/prototype/savePrototype';
+  }
+  
+  function editPrototype(id){
+
+    url = '${cxt!}/admin/prototype/updatePrototype';
+    $('#dlg').dialog({
+        closed: false,
+        cache: false,
+        title: "基础款更新",
+        href:"${cxt!}/admin/prototype/getPrototype/"+id
+    });
+        /* var canvas = $("#canvas")[0];
+        var img = $("#print_frame_img")[0];//new Image();
+        canvas.width = img.width;
+        canvas.height = img.height;
+        var ctx = canvas.getContext('2d');
+        ctx.strokeStyle = "red";
+        var rec = {};
+        var drag = false;
+        //img.src = $("#prototype_pic_img").attr("src");
+        //img.onload = function() {
+	        //ctx.drawImage(img, 0, 0);
+        //}
+        if (row.print_frame) {
+            var print = JSON.parse(row.print_frame);
+            rec.x = Math.round(print.relativeX * canvas.width);
+            rec.y = Math.round(print.relativeY * canvas.height);
+            rec.width = Math.round(print.relativeW * canvas.width);
+            rec.height = Math.round(print.relativeH * canvas.height);
+            ctx.strokeRect(rec.x,rec.y,rec.width,rec.height);
+            $('#startX').val(rec.x);
+            $('#startY').val(rec.y);
+            $('#recW').val(rec.width);
+            $('#recH').val(rec.height);
+        }
+        
+        canvas.onmouseenter = function(event){
+        };
+        
+        canvas.onmouseleave = function(event){
+            $(this).css("cursor", "default");
+        };
+        
+        canvas.onmousemove = function(event){
+        	this.style.cursor = "crosshair";
+
+            // 防止从canvas外滑入
+            if (!drag) return;
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            rec.width = event.layerX - rec.x;
+            rec.height = event.layerY - rec.y;
+            ctx.strokeRect(rec.x,rec.y,rec.width,rec.height);
+            if (rec.width < 0) {
+            	rec.width = Math.abs(rec.width);
+            	rec.x = event.layerX;
+            }
+            if (rec.height < 0) {
+                rec.height = Math.abs(rec.height);
+            	rec.y = event.layerY;
+            }
+            $('#startX').val(rec.x);
+            $('#startY').val(rec.y);
+            $('#recW').val(rec.width);
+            $('#recH').val(rec.height);
+            var print = {};
+            print.type = 'rec';
+            print.relativeX = xround(rec.x * 1.0 / canvas.width, 2);
+            print.relativeY = xround(rec.y * 1.0 / canvas.height, 2);
+            print.relativeW = xround(rec.width * 1.0 / canvas.width, 2);
+            print.relativeH = xround(rec.height * 1.0 / canvas.height, 2);
+            $('#print_frame').val(JSON.stringify(print));
+        };
+        
+        canvas.onmousedown = function(event){
+
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            drag = true;
+            rec.x = event.layerX;
+            rec.y = event.layerY;
+            rec.width = 0;
+            rec.height = 0;
+            $('#startX').val('');
+            $('#startY').val('');
+            $('#recW').val('');
+            $('#recH').val('');
+            $('#print_frame').val('');
+        };
+        canvas.onmouseup = function(event){
+        	
+        	// 防止从canvas外滑入
+        	if (!drag) return;
+            drag = false;
+        };
+        
+        $('#startX,#startY,#recW,#recH').change(function(){
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            rec.x = $('#startX').val();
+            rec.y = $('#startY').val();
+            rec.width = $('#recW').val();
+            rec.height = $('#recH').val();
+            ctx.strokeRect(rec.x,rec.y,rec.width,rec.height);
+
+            var print = {};
+            print.type = 'rec';
+            print.relativeX = xround(rec.x * 1.0 / canvas.width, 2);
+            print.relativeY = xround(rec.y * 1.0 / canvas.height, 2);
+            print.relativeW = xround(rec.width * 1.0 / canvas.width, 2);
+            print.relativeH = xround(rec.height * 1.0 / canvas.height, 2);
+            $('#print_frame').val(JSON.stringify(print));
+        }) */
+    //}
+  }
+  
+  function xround(x, num){
+    return Math.round(x * Math.pow(10, num)) / Math.pow(10, num) ;
+  }
+
+  function editProperties(prototype_id){
+    $("#prototype_id").val(prototype_id);
+    $('#prototypeLayout').layout('remove','north');
+    $('#prototypeLayout').layout('remove','center');
+    $('#prototypeLayout').layout('remove','south');
+    
+    $('#prototypeLayout').layout('add',{
+        region: 'north',
+        height: 340,
+        collapsible:false,
+        border: false,
+        href:"${cxt!}/admin/prototype/getPropertyTypes/"+prototype_id
+    });
+    $('#otherdlg').dialog('open').dialog('setTitle','');
+  }
+  
+  function checkUpdate(needCheck, checkType, id, alert, action) {
+
+	  if (!needCheck) {
+		  action.call();
+		  return;
+	  }
+      $.get('${cxt!}/admin/prototype/'+checkType+'/'+id,function(result){
+        if (result.errorMsg){
+          $.messager.confirm('Confirm', result.errorMsg+alert,function(r){
+              if (r) action.call();
+          });
+        } else {
+        	action.call();
+        }
+      },'json');
+  }
+  
+  function destroyPrototype(prototype_id){
+
+    $.messager.confirm('Confirm', '确认删除该基础款吗?',function(r){
+    	if (r) {
+		    checkUpdate(true, 'checkUpdatePrototype', prototype_id,',仍然删除吗?', function(){
+		    	$.get('${cxt!}/admin/prototype/deletePrototype/'+prototype_id,function(result){
+		          if (result.errorMsg){
+		            $.messager.alert( 'Error', result.errorMsg);
+		          } else {
+		            $('#dg').datagrid('reload');
+		          }
+		        },'json');
+		    });
+    	}
+    });
+  }
+  
+  function save(){
+	  if (!validateForm()) return false;
+	  var prototypeId = $("#dlg_prototype_id").val();
+      checkUpdate(prototypeId, 'checkUpdatePrototype', prototypeId, ',仍然更新吗?', submitForm);
+  }
+  
+  function validateForm() {
+
+      var base_properties = $("#base_properties").textbox("getValue").replace(/：/g,':').replace(/“/g, '"').replace(/”/g, '"').replace(/，/g, ',');
+      $("#base_properties").textbox("setValue", base_properties);
+      /* if (!$('#print_frame').val()) {
+          $.messager.alert( 'Error', '请描画印花区域！');
+          return false;
+      } */
+      return $('#fm').form('validate');
+  }
+  
+  function submitForm() {
+    $('#fm').form('submit',{
+      url: url,
+      onSubmit: function(){
+    	  return true;
+      },
+      success: function(result){
+        var result = eval('('+result+')');
+        if (result.errorMsg){
+          $.messager.alert('Error', result.errorMsg);
+        } else {
+          $('#dlg').dialog('close');        // close the dialog
+          $('#dg').datagrid('reload');  // reload the data
+        }
+      }
+    });
+  }
+  
+</script>

@@ -1,0 +1,280 @@
+<% var toolbar = { %> 
+    
+  <div style="padding:3px">
+    
+    <% if(!isEmpty(classifications)) { %>
+        <% for (category in classifications) { %>
+          <div class="float-left" style="padding:3px">
+            <label>${category.value.name!}</label>
+          </div>
+          <div style="margin-left:50px">
+            <ul style="margin:0px;padding:0px">
+          <% for (classification in category.value.children) { %>
+            <li style="list-style:none;float:left;padding:3px">
+              <input type="checkbox" name="classification_${classification.id}" value="${classification.id}" />${classification.name}
+            </li>
+          <% } %>
+            </ul>
+          </div>
+          <div style="clear:both;margin-bottom: 10px;"></div>
+        <% } %>
+    <% } %>
+    <div style="clear:both;margin-bottom: 10px;"></div>
+    
+    <div class="float-left" style="padding:3px"><label>品牌</label></div>
+    <% if(!isEmpty(brands)) { %>
+        <div style="margin-left:50px">
+          <ul style="margin:0px;padding:0px">
+          <% for (b in brands) { %>
+            <li style="list-style:none;float:left;padding:3px">
+              <input type="checkbox" name="brand_${b.id}" value="${b.id}" />${b.name}
+            </li>
+          <% } %>
+          </ul>
+        </div>
+    <% } %>
+    <div style="clear:both;margin-bottom: 10px;"></div>
+    
+    <% if(!isEmpty(catalogTree)) { %>
+        <% for (catalog in catalogTree) { %>
+          <div class="float-left" style="padding:3px">
+            <label>${catalog.name!}</label>
+          </div>
+          <div style="margin-left:50px">
+            <ul style="margin:0px;padding:0px">
+          <% for (c in catalog.children) { %>
+            <li style="list-style:none;float:left;padding:3px">
+              <input type="checkbox" name="catalog_${c.id}" value="${catalog.id}@${c.id}" />${c.name}
+            </li>
+          <% } %>
+            </ul>
+          </div>
+          <div style="clear:both;margin-bottom: 10px;"></div>
+        <% } %>
+    <% } %>
+    <div style="clear:both;margin-bottom: 10px;"></div>
+    <!-- <span>商品来源</span>
+    <select id="commodity_source" class="easyui-combobox" name="commodity_source" style="width:100px;" editable="false">
+      <option value="">所有</option>
+      <option value="1">用户</option>
+      <option value="2">商家</option>
+    </select> -->
+    <span>商品状态</span>
+    <select id="commodity_status" class="easyui-combobox" name="commodity_status" style="width:100px;" editable="false">
+      <option value="">所有</option>
+      <option value="0">未上架</option>
+      <option value="1">已上架</option>
+      <option value="2">已下架</option>
+    </select>
+    <span>商品可否定制</span>
+    <select id="is_customizable" class="easyui-combobox" name="is_customizable" style="width:100px;" editable="false">
+      <option value="">所有</option>
+      <option value="0">不可定制</option>
+      <option value="1">可定制</option>
+    </select>
+    <input type="checkbox" name="is_new" value="1" id="is_new_s" />
+    <span>只看新品</span>
+    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-search" onclick="doSearch()">检索</a>
+    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-add" onclick="shelve()">商品上架</a>
+  </div>
+<%};
+var datagrid = { %> 
+    <table id="dg">
+    </table>
+<%};
+var dialog = { %> 
+<%};
+var otherDialogs = { %> 
+    <div id="commoditydlg" class="easyui-dialog" style="width:1000px;height:600px;padding:10px 20px" closed="true" buttons="#dlg_buttons">
+    </div>
+<%};
+var dlg_buttons = { %> 
+    <a href="javascript:void(0)" class="easyui-linkbutton c6" iconCls="icon-ok" onclick="save()" style="width:90px">保存</a>
+    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-cancel" onclick="javascript:$('#commoditydlg').dialog('close')" style="width:90px">取消</a>
+<%};
+include("/listLayout.html",
+        {toolbar:toolbar,
+        datagrid:datagrid, 
+        dialog:dialog, 
+        dlg_buttons:dlg_buttons,
+        otherDialogs:otherDialogs,
+        dialog_title:"商品编辑"}){}
+%>
+
+<script type="text/javascript">
+
+  function doSearch() {
+    
+    var classification_ids = $('[name^=classification_]:checked').map(function() {
+    	return $(this).val();
+    }).get().join('_');
+    var brand_ids = $('[name^=brand_]:checked').map(function() {
+    	return $(this).val();
+    }).get().join('_');
+    var catalog_ids = $('[name^=catalog_]:checked').map(function() {
+    	return $(this).val();
+    }).get().join('_');
+    
+	var commodity_source = {1:'用户',2:'商家'};
+    $('#dg').datagrid({
+        title:'',
+        iconCls:'icon-edit',
+        width:1015,
+        height:700,
+        singleSelect:true,
+        idField:'commodity_id',
+        pagination:true,
+        url:"${cxt!}/admin/commodity/searchCommodities/",
+        queryParams: {
+        	commodity_status: $("#commodity_status").combobox("getValue"),
+        	is_customizable: $("#is_customizable").combobox("getValue"),
+        	is_new:$("#is_new_s").prop("checked") ? "1" : "",
+            classification_ids:classification_ids,
+            brand_ids:brand_ids,
+            catalog_ids:catalog_ids
+        },
+        columns:[[
+            {field:'commodity_id',title:'id',width:50,align:'center'},
+            {field:'commodity_name',title:'名称',width:100,align:'center'},
+            {field:'commodity_pic',title:'图片',width:200,formatter:formatPic,align:'center'},
+            {field:'price',title:'价格',width:100,align:'center'},
+            {field:'brand_name',title:'所属品牌',width:100,align:'center'},
+            {field:'commodity_source',title:'来源',width:50,formatter:function(value){
+            	   return commodity_source[value];
+	            },align:'center'},
+            {field:'prototype_id',title:'可否定制',width:100,formatter:function(value){
+            	   return value ? '可定制' : '不可定制';
+	            },align:'center'},
+            {field:'is_shelved',title:'商品状态',width:180,formatter:function(value, row) {
+	            	if (value == 1) {
+	            		return '上架于'+row.shelve_date;
+	            	} else if (row.withdraw_date) {
+	            		return '下架于'+row.withdraw_date;
+	            	} else {
+	            		return '未上架';
+	            	}
+	            },align:'center'},
+            {field:'actions',title:'操作',width:120,formatter:actions,align:'center'}
+        ]]
+    });
+  }
+  
+  function formatPic(value, row, index) {
+	  if (!value) value="default.jpg";
+	  return '<img src="${imageUrl!}/' + value +'" style="width:150px;height:auto" >'
+  }
+  
+  function actions(value, row, index) {
+      var e = '<a href="#" onclick="edit('+row.commodity_id+',\'update\')">编辑</a> ';
+      var s = '<a href="#" onclick="edit('+row.commodity_id+',\'shelve\')">重新上架</a> ';
+      var d = '<a href="#" disabled="disabled" onclick="withdraw('+row.commodity_id+')">下架</a> ';
+      // 是否上架
+      if (row.is_shelved == 1) {
+        return e+d;
+      // 商家定制商品可从此处重新上架
+      } else if (row.commodity_source == 2) {
+        return s;
+      }
+  }
+
+  var url;
+  function edit(commodity_id, action){
+        
+     $('#commoditydlg').dialog({
+         closed: false,
+         cache: false,
+         title: action == "update" ? "商品更新" : "商品重新上架",
+         href:"${cxt!}/admin/commodity/getCommodity/"+commodity_id
+     });
+     url = "${cxt!}/admin/commodity/"+action;
+  }
+  
+  function shelve() {
+     $('#commoditydlg').dialog({
+         closed: false,
+         cache: false,
+         title: "商品上架",
+         href:"${cxt!}/admin/commodity/initCommodity/"
+     });
+     url = "${cxt!}/admin/commodity/saveCommodity";
+  }
+  
+  function save(){
+    $('#commodityfm').form('submit',{
+      url: url,
+      onSubmit: function(){
+        var base_properties = $("#base_properties").textbox("getValue").replace(/：/g,':').replace(/“/g, '"').replace(/”/g, '"').replace(/，/g, ',');
+        $("#base_properties").textbox("setValue", base_properties);
+        if ($("#detail_properties").length != 0) {
+	        var detail_properties = $("#detail_properties").textbox("getValue").replace(/：/g,':').replace(/“/g, '"').replace(/”/g, '"').replace(/，/g, ',');
+	        $("#detail_properties").textbox("setValue", detail_properties);
+        }
+        return $(this).form('validate') && genClassifications() && genCatalogs();
+      },
+      success: function(result){
+        var result = eval('('+result+')');
+        if (result.errorMsg){
+          $.messager.alert('Error', result.errorMsg);
+        } else {
+          $('#commoditydlg').dialog('close');        // close the dialog
+          $('#dg').datagrid('reload');      // reload data
+        }
+      }
+    });
+  }
+  
+  function genClassifications() {
+
+      genClassification('classification', 'category_tree');
+      return true; 
+  }
+  
+  function genCatalogs() {
+	  
+	  genClassification('catalog', 'catalog_tree');
+      return true; 
+  }
+  
+  function genClassification(type, tree) {
+
+      var classifications = $('#'+tree).combotree('tree').tree('getChecked');
+      $('#'+type).val(classifications.map(function(item){
+				        return item['value'];
+				      }).join(','));
+  }
+  
+  function checkWithdraw(id, alert, action) {
+
+      /* if (!needCheck) {
+          action.call();
+          return;
+      } */
+      $.get('${cxt!}/admin/commodity/checkWithdraw/'+id,function(result){
+        if (result.errorMsg){
+          $.messager.confirm('Confirm', result.errorMsg+alert,function(r){
+              if (r) action.call();
+          });
+        } else {
+            action.call();
+        }
+      },'json');
+  }
+  
+  function withdraw(commodity_id){
+
+    $.messager.confirm('Confirm', '确认下架该商品吗?',function(r){
+        if (r) {
+        	checkWithdraw(commodity_id,',仍然下架吗?', function(){
+                $.get('${cxt!}/admin/commodity/withdraw/'+commodity_id,function(result){
+                  if (result.errorMsg){
+                    $.messager.alert( 'Error', result.errorMsg);
+                  } else {
+                    $('#dg').datagrid('reload');
+                  }
+                },'json');
+            });
+        }
+    });
+  }
+  
+</script>

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<sql-statement namespace="manage.logoPrint">
+
+    <sql id="getLogoPrints">
+        <![CDATA[
+            SELECT * 
+              FROM logo_print 
+        ]]>
+    </sql>
+    
+    <sql id="getLogoPrintByType">
+        <![CDATA[
+            SELECT lp.is_multi,
+                   lp.logo_type,
+                   lp.logo_type_name,
+                   group_concat(lp.logo_price order by lp.logo_print_id) all_price,
+                   group_concat(lp.logo_print_id order by lp.logo_print_id) all_id,
+                   group_concat(lp.logo_name order by lp.logo_print_id) all_name,
+                   group_concat(lp.logo_pic order by lp.logo_print_id) all_pic
+              FROM logo_print lp
+          GROUP BY logo_type
+        ]]>
+    </sql>
+    
+    <sql id="getPrototypeLogoPrint">
+        <![CDATA[
+            SELECT lp.is_multi,
+                   lp.logo_type,
+                   lp.logo_type_name,
+                   group_concat(lp.logo_price order by lp.logo_print_id) all_price,
+                   group_concat(lp.logo_print_id order by lp.logo_print_id) all_id,
+                   group_concat(lp.logo_name order by lp.logo_print_id) all_name,
+                   group_concat(lp.logo_pic order by lp.logo_print_id) all_pic,
+                   group_concat(if(ca.prototype_id is not null, '1', '0') order by lp.logo_print_id) all_selected
+              FROM logo_print lp
+         LEFT JOIN commodity_accessory ca
+                ON lp.logo_print_id = ca.logo_print_id 
+               AND ca.prototype_id = ? 
+          GROUP BY logo_type
+        ]]>
+    </sql>
+    
+    <sql id="getCommodityLogoPrint">
+        <![CDATA[
+            SELECT lp.is_multi,
+                   lp.logo_type,
+                   lp.logo_type_name,
+                   group_concat(lp.logo_price order by lp.logo_print_id) all_price,
+                   group_concat(lp.logo_print_id order by lp.logo_print_id) all_id,
+                   group_concat(lp.logo_name order by lp.logo_print_id) all_name,
+                   group_concat(lp.logo_pic order by lp.logo_print_id) all_pic,
+                   group_concat(if(ca.commodity_id is not null, '1', '0') order by lp.logo_print_id) all_selected
+              FROM logo_print lp
+         LEFT JOIN commodity_accessory ca
+                ON lp.logo_print_id = ca.logo_print_id 
+               AND ca.commodity_id = ? 
+          GROUP BY logo_type
+        ]]>
+    </sql>
+
+    <sql id="deletePrototypeLogoPrint">
+        <![CDATA[
+           DELETE 
+             FROM commodity_accessory 
+            WHERE prototype_id = ? 
+              AND logo_print_id is not null
+        ]]>
+    </sql>
+
+    <sql id="deleteCommLogoPrint">
+        <![CDATA[
+           DELETE 
+             FROM commodity_accessory 
+            WHERE commodity_id = ? 
+              AND logo_print_id is not null
+        ]]>
+    </sql>
+</sql-statement>

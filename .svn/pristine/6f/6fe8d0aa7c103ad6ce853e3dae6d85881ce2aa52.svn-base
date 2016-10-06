@@ -1,0 +1,393 @@
+package com.goddess.ec.manage.controller;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.log4j.Logger;
+
+import com.goddess.ec.manage.annotation.Controller;
+import com.goddess.ec.manage.common.DictKeys;
+import com.goddess.ec.manage.common.SplitPage;
+import com.goddess.ec.manage.constants.AppConstants;
+import com.goddess.ec.manage.model.Commodity;
+import com.goddess.ec.manage.model.CommodityPic;
+import com.goddess.ec.manage.model.Prototype;
+import com.goddess.ec.manage.plugin.PropertiesPlugin;
+import com.goddess.ec.manage.service.BrandService;
+import com.goddess.ec.manage.service.CommodityService;
+import com.goddess.ec.manage.tools.ToolDateTime;
+import com.goddess.ec.manage.tools.ToolSqlXml;
+import com.goddess.ec.manage.tools.ToolUtils;
+import com.goddess.ec.manage.tools.ToolWeb;
+import com.jfinal.aop.Before;
+import com.jfinal.kit.JsonKit;
+import com.jfinal.plugin.activerecord.Db;
+import com.jfinal.plugin.activerecord.Record;
+import com.jfinal.plugin.activerecord.tx.Tx;
+import com.jfinal.upload.UploadFile;
+
+/**
+ * 商品
+ */
+@Controller(controllerKey = "/admin/commodity")
+public class CommodityController extends BaseController {
+
+    @SuppressWarnings("unused")
+    private static Logger log = Logger.getLogger(CommodityController.class);
+
+    /**
+     * 商品列表
+     */
+    public void index() {
+    	render("/commodity/commodityList.html");
+    }
+    
+    public void searchCommodities() {
+        SplitPage sp = new SplitPage();
+        // 检索页基本设定
+        sp.setPageNumber(getParaToInt("page"));
+        sp.setPageSize(getParaToInt("rows"));
+        sp.setOrderColunm(getPara("sort"));
+        sp.setOrderMode(getPara("order"));
+
+        // 检索条件
+        Map<String, String> queryParam = new HashMap<String, String>();
+        // 商品来源
+        queryParam.put("commodity_source", getPara(0));
+        String commodityStatus = getPara(1);
+        
+        // 是否上架
+        queryParam.put("is_shelved", StringUtils.isBlank(commodityStatus) ? commodityStatus : (
+        		AppConstants.IS_SHELVED_ON.equals(commodityStatus) ? AppConstants.IS_SHELVED_ON : AppConstants.IS_SHELVED_OFF));
+        // 可否定制
+        queryParam.put("is_customizable", getPara(2));
+        // 条件设定
+        sp.setQueryParam(queryParam);
+
+        // 检索处理
+        CommodityService.service.getCommodities(sp);
+
+        Map<String, Object> jsonRes = new HashMap<String, Object>();
+        jsonRes.put("total",  sp.getPage().getTotalRow());
+        jsonRes.put("rows",  sp.getPage().getList());
+        
+        renderJson(jsonRes);
+    }
+    
+    /**
+     * 商品详情（/commodity/getCommodity/1）
+     */
+    public void getCommodity() {
+    	int commodityId = getParaToInt(0);
+    	Commodity c = CommodityService.service.getCommodityById(commodityId);
+    	List<Record> commodityPics = CommodityService.service.getCommodityPics(commodityId);
+    	
+    	List<Record> commodityPicCarousel = new ArrayList<Record>();
+    	int maxRank = 0;
+    	for (Record r : commodityPics) {
+    		String picType = r.getStr("pic_type");
+    		if (AppConstants.COMMODITY_PIC_TYPE_DETAIL.equals(picType)) {
+    			setAttr("commodity_pic_detail", r.getStr("commodity_pic"));
+    			setAttr("commodity_pic_detail_id", r.getInt("commodity_pic_id"));
+    		} else {
+    			commodityPicCarousel.add(r);
+    			maxRank = r.getInt("rank");
+    		}
+    	}
+    	setAttr("commodity_pic_carousel", commodityPicCarousel);
+    	setAttr("commodity_pic_carousel_max", maxRank);
+    	setAttr("commodity", c);
+
+    	Integer prototypeId = c.getInt("prototype_id");
+    	if (prototypeId != null) {
+    		setAttr("ref_price", Prototype.dao.findById(prototypeId).getInt("base_price") + CommodityService.service.getAdditionPrice(c.getStr("property_key")));
+
+        	List<Record> customizePros = CommodityService.service.getCommodityCustomizationProps(null, commodityId);
+
+        	setAttr("tm", customizePros);
+        	setAttr("img_root", PropertiesPlugin.getParamMapValue(DictKeys.image_url));
+    	}
+    	
+    	// 商品品牌
+    	setAttr("brands", BrandService.service.getAll());
+
+    	// 商品类别
+    	classificationTree();
+    	// 已选商品类别
+    	List<Record> commodityClassification = Db.find(ToolSqlXml.getSql("manage.commodity.getCommodityClassification"), commodityId);
+    	Set<Integer> selectedClassification = new HashSet<Integer>();
+    	for (Record r : commodityClassification) {
+    		selectedClassification.add(r.getInt("classification_id"));
+    	}
+    	setAttr("category", commodityClassification.size() == 0 ? AppConstants.CATEGORY_BAG : commodityClassification.get(0).getStr("category"));
+    	setAttr("selectedClassification", selectedClassification);
+
+    	// 商品筛选条件
+    	catalogTree();
+    	List<Record> commodityCatalog = Db.find(ToolSqlXml.getSql("manage.commodity.getCommodityCatalog"), commodityId);
+    	Set<Integer> selectedCatalog = new HashSet<Integer>();
+    	for (Record r : commodityCatalog) {
+    		selectedCatalog.add(r.getInt("catalog_id"));
+    	}
+    	setAttr("selectedCatalog", selectedCatalog);
+    	
+    	render("/commodity/commodityDetail.html");
+    }
+    
+    private void classificationTree() {
+    	
+    	List<Record> nodes = Db.find(ToolSqlXml.getSql("manage.classification.getAllClassification"));
+    	Map<Integer, Record> classificationTree = new HashMap<Integer, Record>();
+//    	List<Record> classificationRoots = getTree(nodes, classificationTree);
+
+    	Map<String, Record> categories = new HashMap<String, Record>();
+    	for (Record r : nodes) {
+    		Integer parentId = r.getInt("parent_id");
+
+    		classificationTree.put(r.getInt("id"), r);
+    		if (parentId != 0) {
+
+    			Record node = classificationTree.get(parentId);
+    			List<Record> children = node.get("children");
+    			if (children == null) {
+    				children = new ArrayList<Record>();
+    				node.set("children", children);
+    			}
+    			children.add(r);
+    		// 1级结点，父结点为0
+    		} else {
+    			Record category =categories.get(r.getStr("category"));
+    			if (category == null) {
+        			List<Record> children = new ArrayList<Record>();
+    				category = new Record().set("children", children);
+    				categories.put(r.getStr("category"), category);
+    			}
+    			List<Record> children = category.get("children");
+    			children.add(r);
+    		}
+    	}
+    
+    	setAttr("classificationTreeJson", JsonKit.toJson(classificationTree));
+    	setAttr("categories", JsonKit.toJson(categories));
+    }
+    
+    private void catalogTree() {
+
+    	List<Record> allCatalog = Db.find(ToolSqlXml.getSql("manage.catalog.getAllCatalog"));
+    	Map<Integer, Record> catalogTree = new HashMap<Integer, Record>();
+    	List<Record> catagories = getTree(allCatalog, catalogTree);
+    	setAttr("catagories", JsonKit.toJson(catagories));
+    	setAttr("catalogTreeJson", JsonKit.toJson(catalogTree));
+    }
+    
+    private List<Record> getTree(List<Record> nodes, Map<Integer, Record> catalogTree) {
+    	List<Record> roots = new ArrayList<Record>();
+    	for (Record r : nodes) {
+    		Integer parentId = r.getInt("parent_id");
+
+    		catalogTree.put(r.getInt("id"), r);
+    		if (parentId != 0) {
+
+    			Record node = catalogTree.get(parentId);
+    			List<Record> children = node.get("children");
+    			if (children == null) {
+    				children = new ArrayList<Record>();
+    				node.set("children", children);
+    			}
+    			children.add(r);
+    		// 0级结点，父结点为0
+    		} else {
+    			roots.add(r);
+    		}
+    	}
+    	return roots;
+    }
+    
+    /**
+     * 非定制商品上架，初始化商品详情页面
+     */
+    public void initCommodity() {
+    	Commodity c = new Commodity();
+    	c.set("commodity_source", AppConstants.COMMODITY_SOURCE_MERCHANT);
+    	// 商品分类
+//    	List<Record> catagories = catalogTree();
+//    	setAttr("catagory", catagories);
+//    	int selectedCatagory = catagories.size() == 0 ? 0 : catagories.get(0).getInt("id");
+//    	setAttr("selectedCatagory", selectedCatagory);
+    	setAttr("commodity", c);
+    	render("/commodity/commodityDetail.html");
+    }
+    
+    /**
+     * 更新商品
+     * @throws IOException 
+     */
+    @Before(Tx.class)
+    public void update() {
+    	try {
+			updateCommodity(false);
+		} catch (IOException e) {
+			e.printStackTrace();
+			setAttr("errorMsg", "上传图片存储失败！");
+		}
+    	renderJson(new String[]{"errorMsg"});
+    }
+
+    /**
+     * 商家定制商品重新上架
+     * @throws IOException
+     */
+    @Before(Tx.class)
+    public void shelve() {
+    	try {
+			updateCommodity(true);
+		} catch (IOException e) {
+			e.printStackTrace();
+			setAttr("errorMsg", "上传图片存储失败！");
+		}
+    	renderJson(new String[]{"errorMsg"});
+    }
+    
+    private void updateCommodity(boolean shelve) throws IOException {
+    	// 0.商品图片
+    	List<UploadFile> upFiles = getFiles();
+    	
+    	Integer commodityId = getParaToInt("commodity_id");
+    	Integer brandId = getParaToInt("brand_id");
+    	String category = getPara("category");
+    	
+    	Commodity c = Commodity.dao.findById(commodityId);
+    	uploadPic(upFiles, commodityId, c);
+		// 更新商品
+    	c.set("commodity_name", getPara("commodity_name")).set(
+    		"base_properties", getPara("base_properties")).set(
+			"detail_properties", getPara("detail_properties")).set(
+			"commodity_des", getPara("commodity_des")).set(
+			"price", getParaToInt("price")).set(
+			"brand_id", brandId);
+    	// 更新商品分类
+    	if (StringUtils.isNotEmpty(getPara("classification"))) {
+    		String[] classifications = getPara("classification").split("_");
+    		// 删除原有的类别id
+    		Db.update(ToolSqlXml.getSql("manage.commodity.deleteClassificationByCommodity"), commodityId);
+    		// 添加新的类别id
+    		for (String cid : classifications) {
+    			Db.update(ToolSqlXml.getSql("manage.commodity.addCommodityClassification"), commodityId, Integer.valueOf(cid), brandId, category);
+    		}
+    	} else {
+    		Db.update(ToolSqlXml.getSql("manage.commodity.updateClassificationBrand"), brandId, commodityId);
+    	}
+    	
+    	if (StringUtils.isNotEmpty(getPara("catalog"))) {
+    		String[] catalogs = getPara("catalog").split("_");
+    		// 删除原有的目录id
+    		Db.update(ToolSqlXml.getSql("manage.commodity.deleteCatalogByCommodity"), commodityId);
+    		// 添加新的目录id
+    		for (String cid : catalogs) {
+    			Db.update(ToolSqlXml.getSql("manage.commodity.addCommodityCatalog"), commodityId, Integer.valueOf(cid));
+    		}
+    	}
+    	
+    	// 更新上架
+		if (shelve)
+			c.set("shelve_date", ToolDateTime.getNow()).set(
+			"is_shelved", AppConstants.IS_SHELVED_ON);
+		c.update();
+    }
+    
+    /**
+     * 上传商品图片
+     * @param upFiles
+     * @param commodityId
+     * @param c
+     * @throws IOException
+     */
+    private void uploadPic(List<UploadFile> upFiles, int commodityId, Commodity c) throws IOException {
+
+    	// 1.添加商品图片
+		for (UploadFile f : upFiles) {
+			String picType = f.getParameterName();
+			String saveURL = ToolUtils.saveUploadFile(f, AppConstants.RELATIVE_PATH_COMMODITY + commodityId, 
+					picType, ToolUtils.getExtension(f.getOriginalFileName()));
+			if ("commodity_pic_img".equals(picType)) {
+				c.set("commodity_pic", saveURL);
+			} else if (StringUtils.isNotBlank(getPara(picType+"id"))) {
+				CommodityPic.dao.findById(getParaToInt(picType+"id")).set("commodity_pic", saveURL).update();
+			} else {
+				String rank = picType.substring(picType.lastIndexOf("_")+1);
+				picType = picType.substring(0, picType.lastIndexOf("_")+1);
+				CommodityPic cp = new CommodityPic().set("commodity_id", commodityId).set(
+														"pic_type", getPara(picType+"type")).set(
+														"commodity_pic", saveURL).set(
+														"rank", StringUtils.isBlank(rank) ? 0 : Integer.valueOf(rank));
+				cp.save();
+			}
+		}
+		// 2. 删除商品轮播图图片
+		Map<String, String> params = ToolWeb.getParamMap(getRequest());
+		for(String key : params.keySet()) {
+			if (key.startsWith("delete_commodity_pic_") && AppConstants.DELETE_FLAG_INVALID.equals(params.get(key))) {
+				CommodityPic.dao.deleteById(key.replace("delete_commodity_pic_", ""));
+			}
+		}
+    }
+    
+    /**
+     * 非定制商品上架
+     * @throws IOException
+     */
+    @Before(Tx.class)
+    public void saveCommodity() throws IOException {
+
+    	// 0.商品图片
+    	List<UploadFile> upFiles = getFiles();
+    	
+    	Commodity c = new Commodity();
+		// 更新商品
+    	c.set("commodity_name", getPara("commodity_name")).set(
+    		"base_properties", getPara("base_properties")).set(
+			"detail_properties", getPara("detail_properties")).set(
+			"commodity_source", AppConstants.COMMODITY_SOURCE_MERCHANT).set(
+			"commodity_des", getPara("commodity_des")).set(
+			"price", getParaToInt("price")).set(
+//			"return_points", calcReturnPoints(getParaToInt("price"))).set(
+			"shelve_date", ToolDateTime.getNow()).set(
+			"is_shelved", AppConstants.IS_SHELVED_ON).save();
+    	int commodityId = c.getInt("commodity_id");
+    	c = Commodity.dao.findById(commodityId);
+		uploadPic(upFiles, commodityId, c);
+		// 更新商品图片地址
+		c.update();
+    	renderJson();
+    }
+    
+    /**
+     * 验证需要下架的商品
+     */
+    public void checkWithdraw() {
+    	
+    	int commodityId = getParaToInt(0);
+    	// 是否在购物车中
+    	Record r = null;
+    	if ((r = Db.findFirst(ToolSqlXml.getSql("manage.commodity.getScCommodity"), commodityId)) != null) {
+			setAttr("errorMsg", "即将删除的商品在用户【"+r.getStr("cell_num")+"】的购物车中");
+		} else if ((r = Db.findFirst(ToolSqlXml.getSql("manage.commodity.getUnpaidCommodity"), 0, commodityId)) != null) {
+			setAttr("errorMsg", "即将删除的商品在用户【"+r.getStr("cell_num")+"】的未支付订单中");
+		}
+    	renderJson(new String[]{"errorMsg"});
+    }
+
+    @Before(Tx.class)
+    public void withdraw() {
+
+    	int commodityId = getParaToInt(0);
+    	Commodity.dao.findById(commodityId).set("is_shelved", AppConstants.IS_SHELVED_OFF).set("withdraw_date", ToolDateTime.getNow()).update();
+    	renderJson();
+    }
+}

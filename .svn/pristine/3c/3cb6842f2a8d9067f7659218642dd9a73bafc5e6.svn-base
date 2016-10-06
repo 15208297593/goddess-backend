@@ -1,0 +1,18 @@
+# \u65e5\u5fd7\u7ea7\u522b
+log4j.rootLogger=error, console, file
+
+# \u8f93\u51fa\u5230\u63a7\u5236\u53f0
+log4j.appender.console=org.apache.log4j.ConsoleAppender
+log4j.appender.console.layout=org.apache.log4j.PatternLayout
+log4j.appender.console.layout.ConversionPattern=%n%-d{yyyy-MM-dd HH:mm:ss}%n[%p]-[Thread: %t]-[%C.%M()]: %m%n
+
+# \u8f93\u51fa\u5230\u6587\u4ef6
+log4j.appender.file=org.apache.log4j.RollingFileAppender
+log4j.appender.file.encoding=UTF-8
+log4j.appender.file.Append=true
+log4j.appender.file.Threshold=info
+log4j.appender.file.MaxFileSize=102400KB
+log4j.appender.file.MaxBackupIndex=100
+log4j.appender.file.File=ecsite.log
+log4j.appender.file.layout=org.apache.log4j.PatternLayout
+log4j.appender.file.layout.ConversionPattern=%-d{yyyy-MM-dd HH\:mm\:ss} [%c]-[%p] %m%n

@@ -1,0 +1,195 @@
+package com.goddess.ec.manage.tools;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.Writer;
+import java.text.DecimalFormat;
+import java.util.UUID;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.log4j.Logger;
+
+import com.goddess.ec.manage.common.DictKeys;
+import com.goddess.ec.manage.plugin.PropertiesPlugin;
+import com.jfinal.kit.PathKit;
+import com.jfinal.upload.UploadFile;
+import com.thoughtworks.xstream.XStream;
+import com.thoughtworks.xstream.core.util.QuickWriter;
+import com.thoughtworks.xstream.io.HierarchicalStreamWriter;
+import com.thoughtworks.xstream.io.xml.PrettyPrintWriter;
+import com.thoughtworks.xstream.io.xml.XppDriver;
+
+/**
+ * 公共工具类
+ */
+public class ToolUtils {
+
+	@SuppressWarnings("unused")
+	private static Logger log = Logger.getLogger(ToolUtils.class);
+
+	/**
+	 * double精度调整
+	 * 
+	 * @param doubleValue
+	 *            需要调整的值123.454
+	 * @param format
+	 *            目标样式".##"
+	 * @return
+	 */
+	public static String decimalFormatToString(double doubleValue, String format) {
+		DecimalFormat myFormatter = new DecimalFormat(format);
+		String formatValue = myFormatter.format(doubleValue);
+		return formatValue;
+	}
+
+	/**
+	 * 获取UUID by jdk
+	 * 
+	 * @return
+	 */
+	public static String getUuidByJdk(boolean is32bit) {
+		String uuid = UUID.randomUUID().toString();
+		if (is32bit) {
+			return uuid.toString().replace("-", "");
+		}
+		return uuid;
+	}
+	
+	/**
+	 * 保存上传的文件,添加日期后缀
+	 * @param upFile
+	 * @param relativePicPath
+	 * @param newPicName
+	 * @return
+	 * @throws IOException
+	 */
+	public static String saveUploadFile(UploadFile upFile, String desPicPath, String newPicName, String extension) throws IOException {
+		
+		String fileName = newPicName + "_" + ToolDateTime.getNowStr() + extension;
+		String fileURL = String.format("%s/%s", desPicPath, fileName);
+		FileUtils.moveFile(upFile.getFile(), deleteDesFile(desPicPath, fileName));
+        return fileURL;
+	}
+	
+	/**
+	 * 保存上传的文件，不增加随机数后缀
+	 * @param upFile
+	 * @param relativePicPath
+	 * @param newPicName
+	 * @return
+	 * @throws IOException
+	 */
+	public static String saveUploadFileWithoutSurfix(UploadFile upFile, String desPicPath, String newPicName) throws IOException {
+		
+		String fileURL = String.format("%s/%s", desPicPath, newPicName);
+		FileUtils.moveFile(upFile.getFile(), deleteDesFile(desPicPath, newPicName));
+        return fileURL;
+	}
+	
+	/**
+	 * 复制文件
+	 * @param sourceFile
+	 * @param relativePicPath
+	 * @param newPicName
+	 * @return
+	 * @throws IOException
+	 */
+	public static String copyFile(String sourceFile, String desPicPath, String newPicName) throws IOException {
+		
+		String fileURL = String.format("%s/%s", desPicPath, newPicName);
+		FileUtils.copyFile(new File(getPicPath(sourceFile)), deleteDesFile(desPicPath, newPicName));
+        return fileURL;
+	}
+	
+	/**
+	 * 上传文件流保存
+	 * @param data
+	 * @param relativePicPath
+	 * @param newPicName
+	 * @return
+	 * @throws IOException
+	 */
+	public static String saveFile(byte[] data, String desPicPath, String newPicName) throws IOException {
+
+		String fileURL = String.format("%s/%s", desPicPath, newPicName);
+		FileUtils.writeByteArrayToFile(deleteDesFile(desPicPath, newPicName), data);
+		return fileURL;
+	}
+	
+	public static File deleteDesFile(String desFilePath, String fileName) throws IOException {
+		
+		File desDir = new File(getPicPath(desFilePath));
+		if (!desDir.exists()) FileUtils.forceMkdir(desDir);
+		File desFile = new File(desDir, fileName);
+		FileUtils.deleteQuietly(desFile);
+		return desFile;
+	}
+	
+    public static String getPicPath(String relativePicPath) {
+        return String.format("%s/%s/%s/", PropertiesPlugin.getParamMapValue(DictKeys.image_root).toString(), PropertiesPlugin.getParamMapValue(DictKeys.image_path), relativePicPath);
+//        return String.format("%s/%s/%s/", PathKit.getWebRootPath(), PropertiesPlugin.getParamMapValue(DictKeys.image_path), relativePicPath);
+    }
+    
+    public static String getImgUrl(String imgPath) {
+    	return String.format("%s/%s/", PropertiesPlugin.getParamMapValue(DictKeys.image_url), imgPath);
+    }
+
+    public static String getExtension(String fileName) {
+        return fileName.substring(fileName.lastIndexOf('.'));
+    }
+
+	private static <T> XStream getXStream(XStream xstream, Class<T> clazz) {
+		if (xstream == null) {
+			xstream = new XStream(new XppDriver() {
+			      @Override
+			      public HierarchicalStreamWriter createWriter(Writer out) {
+			        return new PrettyPrintWriter(out) {
+			          boolean cdata = false;
+			          @Override
+			          public void startNode(String name,
+			              @SuppressWarnings("rawtypes") Class clazz) {
+			            super.startNode(name, clazz);
+			            if(!name.equals("xml")){
+							if ("java.lang.String".equals(clazz.getName()))
+								cdata = true;
+							else
+								cdata = false;
+			            }
+			          }
+
+			          @Override
+			          protected void writeText(QuickWriter writer, String text) {
+			            if (cdata) {
+			              writer.write(cDATA(text));
+			            } else {
+			              writer.write(text);
+			            }
+			          }
+			        };
+			      }
+			    });
+			xstream.autodetectAnnotations(true);
+		}
+		xstream.alias("xml", clazz);
+		return xstream;
+	}
+	
+	private static String cDATA(String text) {
+		return String.format("<![CDATA[%s]]>", text);
+	}
+	
+	public static <T> String toXml(XStream xstream, Object o) {
+		return getXStream(xstream, o.getClass()).toXML(o).replace("__", "_");
+	}
+
+	@SuppressWarnings("unchecked")
+	public static <T> T fromXml(XStream xstream, Class<T> clazz, String sXml) {
+		return (T) getXStream(xstream, clazz).fromXML(sXml);
+	}
+	
+	public static void main(String[] args) {
+//		System.out.println(getUuidByJdk(true));
+		for (int i = 1; i < 50; i++)
+			System.out.println((char)('0'-i));
+	}
+}

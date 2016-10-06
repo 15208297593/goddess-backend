@@ -1,0 +1,6 @@
+mail.transport.protocol = smtp
+mail.smtp.auth = true
+mail.host = smtp.mxhichina.com
+mail.user = nvshenzhuyifh@nvshenzhuyi.com
+mail.password = Qwerty1234
+mail.from = nvshenzhuyifh@nvshenzhuyi.com

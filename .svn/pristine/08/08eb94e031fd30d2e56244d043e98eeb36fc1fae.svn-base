@@ -1,0 +1,120 @@
+<div class="sub-panel">
+    <div id="typeToolbar" style="padding-bottom:5px;">
+        <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-add" onclick="addPropertyType()">添加新类别</a>
+    </div>
+    <table id="typeDg" title="" class="easyui-datagrid" style="width:820px;height:200px"
+        url="${cxt!}/admin/cusConfigure/getPropertyTypesByPid/${prototype_id}"
+        toolbar="#typeToolbar" pagination="false"
+        rownumbers="false" singleSelect="true">
+        <thead>
+            <tr>
+                <th field="property_type_id" width="60" align='center'>类别标识</th>
+                <th field="type_name" align='center' width="100">类别名称</th>
+                <th field="type_name_ext" align='center' width="100">类别名称(英文)</th>
+                <th field="is_base" width="90" align='center' formatter="isBase">是否基本类别</th>
+                <th field="base_type_name" align='center' width="150">原材料类别名称</th>
+                <th field="rank" width="100" align='center'>显示顺序</th>
+                <th field="action" width="200" formatter="typeActions" align='center'>操作</th>
+            </tr>
+        </thead>
+    </table>
+    <div style="clear:both;height:5px"></div>
+</div>
+<script type="text/javascript">
+
+    function isBase(value, row, index) {
+    	return value == '1' ? '是' : '否';
+    }
+    
+    function typeActions(value, row, index) {
+        
+        var et = '<a href="#" onclick="editPropertyType('+row.property_type_id+',\''+(row.type_name || '')+'\')">编辑</a> ';
+        var c = '<a href="#" onclick="deletePropertyType('+row.property_type_id+','+(row.is_base || 0)+')">删除</a>';
+    	if (row.is_base == "1") {
+            var lb = '<a href="#" onclick="linkBase('+row.property_type_id+','+row.base_ref_type+','+row.exhibition_type+')">关联基本类别属性</a> ';
+            return lb+et+c;
+    	}
+        return et+c;
+    }
+    
+    function linkBase(base_type, base_ref_type, exhibition_type) {
+
+    	if ($('#typeDg').datagrid('getRows').length == 1) {
+
+            $.messager.alert( 'Error', '请先设定其他非基本类别，再进行关联操作！', "error");
+    	}
+        var centerPanel = $('#prototypeLayout').layout('panel', 'center');
+        var href = "${cxt!}/admin/cusConfigure/linkBase/"+base_ref_type+'-'+${prototype_id}+'-'+exhibition_type+'-'+base_type;
+        if (centerPanel && centerPanel.length > 0) {
+            centerPanel.panel('clear');
+            centerPanel.panel({title:'关联基本类别属性', href:href});
+        } else {
+	        $('#prototypeLayout').layout('add',{
+	            region: 'center',
+	            height: 350,
+	            width:580,
+	            title:'关联基本类别属性',
+	            collapsible:false,
+	            border: false,
+	            href:href
+	        });
+        }
+    }
+    
+    function addPropertyType() {
+
+        var centerPanel = $('#prototypeLayout').layout('panel', 'center');
+        var href = "${cxt!}/admin/cusConfigure/getPropertyType/0-"+${prototype_id};
+        if (centerPanel && centerPanel.length > 0) {
+        	centerPanel.panel('clear');
+        	centerPanel.panel({title:'新类别', href:href});
+        } else {
+            $('#prototypeLayout').layout('add',{
+                region: 'center',
+                height: 310,
+                title:'新类别',
+                collapsible:false,
+                border: false,
+                href:href
+            });
+        }
+    }
+    
+    function editPropertyType(property_type_id, type_name) {
+
+        var centerPanel = $('#prototypeLayout').layout('panel', 'center');
+        var href = "${cxt!}/admin/cusConfigure/getPropertyType/"+property_type_id + '-'+${prototype_id};
+        if (centerPanel && centerPanel.length > 0) {
+        	centerPanel.panel('clear');
+        	centerPanel.panel({title:type_name, href:href});
+        } else {
+            $('#prototypeLayout').layout('add',{
+                region: 'center',
+                height: 300,
+                title:type_name,
+                collapsible:false,
+                border: false,
+                href:href
+            });
+        }
+    }
+
+    function deletePropertyType(property_type_id, is_base) {
+
+        $.messager.confirm('删除属性类别','关联该类别的类别都将删除，确认删除吗?',function(r){
+          if (r){
+              checkUpdate(true, 'checkUpdateType', property_type_id,',仍然删除吗?', function(){
+                $.get('${cxt!}/admin/cusConfigure/deletePropertyType/'+property_type_id+'-'+is_base,function(result){
+                  if (result.errorMsg){
+                    $.messager.alert( 'Error', result.errorMsg, "error");
+                  } else {
+                    $('#typeDg').datagrid('reload');
+                    $.messager.alert('Info', "更新成功！", "info");
+                  }
+                },'json');
+              });
+          }
+        });
+    }
+    
+</script>

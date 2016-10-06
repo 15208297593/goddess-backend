@@ -1,0 +1,172 @@
+<% var toolbar = { %> 
+    
+  <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-add" onclick="addCatagory()">添加新分类</a>
+<%};
+var datagrid = { %> 
+    <table id="dg" title="" class="easyui-treegrid" style="width:610px;height:600px"
+        url="${cxt!}/admin/catalog/catalogTree"
+        toolbar="#toolbar" idField="id" treeField="name"
+        rownumbers="false" singleSelect="true">
+        <thead>
+            <tr>
+                <th field="name" width="200">名称</th>
+                <th field="id" width="50" align='center'>id</th>
+                <th field="level" width="100" align='center'>级别</th>
+                <th field="rank" width="100" align='center'>排序</th>
+                <th field="action" width="150" formatter="actions" align='center'>操作</th>
+            </tr>
+        </thead>
+    </table>
+<%};
+var dialog = { %> 
+<%};
+var otherDialogs = { %> 
+
+    <div id="otherdlg" class="easyui-dialog" style="width:500px;height:250px;padding:10px 20px" closed="true" buttons="#othderDlgButtons">
+        <form id="catalogForm" method="post" novalidate>
+            <div class="fitem for_parent">
+                <label>父类别</label>
+                <span id="parent_name"></span>
+            </div>
+		    <div class="fitem">
+		        <label>名称</label>
+		        <input id="name" name="name" class="easyui-textbox" required="true" data-options="validType:'maxLength[16]'">
+		    </div>
+		    <div class="fitem">
+		        <label>排序</label>
+		        <input id="rank" name="rank" class="easyui-textbox" required="true" data-options="validType:'range[1,100]'">
+                <span style="color:red">* 1~100,数值越小越靠前</span>
+		    </div>
+		    <div class="fitem">
+		        <label>级别</label>
+		        <input id="level" name="level" class="easyui-textbox" readonly="true">
+		    </div>
+		    <input type="hidden" name="id" id="id">
+		    <input type="hidden" name="parent_id" id="parent_id">
+        </form>
+    </div>
+    <div id="othderDlgButtons">
+	    <a href="javascript:void(0)" class="easyui-linkbutton c6" iconCls="icon-ok" onclick="save()" style="width:90px">保存</a>
+	    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-cancel" onclick="javascript:$('#otherdlg').dialog('close')" style="width:90px">取消</a>
+    </div>
+<%};
+var dlg_buttons = { %> 
+<%};
+include("/listLayout.html",
+        {toolbar:toolbar,
+        datagrid:datagrid, 
+        dialog:dialog, 
+        dlg_buttons:dlg_buttons,
+        otherDialogs:otherDialogs,
+        dialog_title:"目录编辑"}){}
+%>
+
+<script type="text/javascript">
+
+	function actions(value, row) {
+      var a = '<a href="#" onclick="addChild('+row.id+','+row.level+',\''+row.name+'\')">添加子目录</a> ';
+      var e = '<a href="#" onclick="edit('+row.id+','+row.level+')">编辑</a> ';
+      var d = '<a href="#" onclick="deleteNode('+row.id+')">删除</a> ';
+      return a+e+d;
+	}
+
+  var url;
+  var broNodes;
+  function addChild(id, level, name) {
+
+    $('#catalogForm').form('clear');
+    url = '${cxt!}/admin/catalog/saveCatalog';
+    $("#level").textbox("setValue", level + 1);
+    $("#parent_id").val(id);
+    broNodes = $("#dg").treegrid("getChildren", id).filter(function(item){
+        return level == (item.level-1);
+    });
+    $(".for_parent").show();
+    $("#parent_name").html(name);
+    $('#otherdlg').dialog('open').dialog('setTitle','');
+  }
+	
+	function edit(id, level) {
+
+	    $('#dg').treegrid('select',id);
+	    var node = $('#dg').treegrid('getSelected');
+	    if (node) {
+	        $('#catalogForm').form('clear');
+	        $('#catalogForm').form('load',node);
+	        url = '${cxt!}/admin/catalog/updateCatalog';
+	        var pNode = $("#dg").treegrid("getParent", id);
+	        if (!pNode) {
+		        broNodes = $("#dg").treegrid("getRoots").filter(function(item){
+                    return id != item.id;
+                });
+	        } else {
+		        broNodes = $("#dg").treegrid("getChildren", pNode.id).filter(function(item){
+		        	return level == item.level && id != item.id;
+		        });
+	        }
+	        $(".for_parent").hide();
+	        $('#otherdlg').dialog('open').dialog('setTitle','');
+	    }
+	}
+	
+	function addCatagory() {
+
+	    $('#catalogForm').form('clear');
+	    url = '${cxt!}/admin/catalog/saveCatalog';
+	    $("#level").textbox("setValue", "0");
+	    $("#parent_id").val(0);
+        broNodes = $("#dg").treegrid("getRoots");
+        $(".for_parent").hide();
+	    $('#otherdlg').dialog('open').dialog('setTitle','');
+	}
+	
+	function checkRank() {
+		var rank = $("#rank").textbox("getValue");
+		return broNodes.every(function(item){
+			if (rank == item.rank) {
+	          $.messager.alert('Warning', "与【"+item.name+"】的排序相同！");
+			  return false;
+			}
+			return true;
+		})
+	}
+	  
+  function save(){
+    $('#catalogForm').form('submit',{
+      url: url,
+      onSubmit: function(){
+          return $(this).form('validate') && checkRank();
+      },
+      success: function(result){
+        var result = eval('('+result+')');
+        if (result.errorMsg){
+          $.messager.alert('Error', result.errorMsg);
+        } else {
+          $('#otherdlg').dialog('close');        // close the dialog
+          $('#dg').treegrid('reload');      // reload data
+        }
+      }
+    });
+  }
+  
+  function deleteNode(id) {
+
+      $.messager.confirm('Confirm','该目录及其子目录都将删除，确认删除吗?',function(r){
+        if (r){
+		  var delIds = $("#dg").treegrid("getChildren", id).map(function(item){
+			  return item.id
+		  });
+		  delIds.push(id);
+		  $.get('${cxt!}/admin/catalog/deleteCatalog/'+delIds.join('_'),function(result){
+	          if (result.errorMsg){
+	            $.messager.alert( 'Error', result.errorMsg, 'error');
+	          } else {
+	            $.messager.alert('', '删除成功！', 'info');
+	            $('#dg').treegrid('reload');      // reload data
+	          }
+	      },'json');
+		}
+	  });
+  }
+  
+</script>

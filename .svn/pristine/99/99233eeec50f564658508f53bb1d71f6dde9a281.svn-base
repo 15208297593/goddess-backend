@@ -1,0 +1,138 @@
+<% var toolbar = { %> 
+  <form id="searchForm">
+	  <div style="padding:3px">
+	    <span>注册日期</span>
+	    <input class="easyui-datebox" id="register_date_from" name="register_date_from" editable="false" style="width:150px"> - 
+	    <input class="easyui-datebox" id="register_date_to" name="register_date_to" editable="false" validType="dateGreat['#register_date_from']" style="width:150px">
+	    <span style="margin-left:20px">手机号</span>
+	    <input id="cell_num" name="cell_num" class="easyui-textbox" value="">
+	  <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-search" onclick="doSearch()">检索</a>
+	  </div>
+  </form>
+<%};
+var datagrid = { %> 
+    <table id="dg">
+    </table>
+<%};
+var dialog = { %> 
+<%};
+var otherDialogs = { %> 
+    <div id="userdlg" class="easyui-dialog" style="width:500px;height:200px;padding:10px 20px" modal="true" closed="true" buttons="#dlg_buttons">
+        <div class="fitem">
+            <label>奖励积分</label>
+            <input id="points_award" name="points_award" class="easyui-textbox" data-options="required:true,validType:'Integer'">
+        </div>
+    </div>
+<%};
+var dlg_buttons = { %> 
+    <a href="javascript:void(0)" class="easyui-linkbutton c6" iconCls="icon-ok" onclick="save()" style="width:90px">保存</a>
+    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-cancel" onclick="javascript:$('#userdlg').dialog('close')" style="width:90px">取消</a>
+<%};
+include("/listLayout.html",
+        {toolbar:toolbar,
+        datagrid:datagrid, 
+        dialog:dialog, 
+        dlg_buttons:dlg_buttons,
+        otherDialogs:otherDialogs,
+        dialog_title:""}){}
+%>
+<script type="text/javascript">
+
+  $(function(){
+      var buttons = $.extend([], $.fn.datebox.defaults.buttons);
+      buttons.splice(1, 1, {
+          text: 'Clear',
+          handler: function(target){
+              $(target).datebox("setValue", "");
+              $(this).closest("div.combo-panel").panel("close");
+          }
+      });
+      $('#register_date_from').datebox({
+          buttons: buttons
+      });
+      $('#register_date_to').datebox({
+          buttons: buttons
+      });
+  });
+  
+  function doSearch() {
+
+    if (!$('#searchForm').form('validate'))
+    	return;
+    var user_status = {0:'正常',1:'已删除'};
+    $('#dg').datagrid({
+        title:'',
+        iconCls:'icon-edit',
+        width:1050,
+        height:500,
+        singleSelect:true,
+        idField:'user_id',
+        pagination:true,
+        url:"${cxt!}/admin/user/searchUsers?"+$("#searchForm").serialize(),
+        columns:[[
+            {field:'user_id',title:'用户id',width:50,align:'center'},
+            {field:'cell_num',title:'手机号',width:100,align:'center'},
+            {field:'nick_name',title:'昵称',width:100,align:'center'},
+            {field:'points',title:'积分',width:100,align:'center'},
+            {field:'collection_amount',title:'收藏数',width:100,align:'center',sortable:true,order:"desc"},
+            {field:'customization_amount',title:'定制数',width:100,align:'center',sortable:true,order:"desc"},
+            {field:'order_amount',title:'订单数',width:100,align:'center',sortable:true,order:"desc"},
+            {field:'register_date',title:'注册日期',width:150,align:'center'},
+            {field:'delete_flag',title:'用户状态',width:100,align:'center',formatter:function(value) {
+                return user_status[value];
+            }},
+            {field:'actions',title:'操作',width:120,formatter:actions,align:'center'}
+        ]]
+    });
+  }
+  
+  function formatPic(value, row, index) {
+      if (!value) value="default.jpg";
+      return '<img src="${imageUrl!}/' + value +'" style="width:100px;height:100px" >'
+  }
+  
+  function actions(value, row, index) {
+      var a = '<a href="#" onclick="awardPoints('+row.user_id+')">奖励积分</a> ';
+      var d = '<a href="#" onclick="markUser('+row.user_id+',\''+ row.nick_name +'\',1)">删除用户</a> ';
+      var r = '<a href="#" onclick="markUser('+row.user_id+',\''+ row.nick_name +'\',0)">恢复用户</a> ';
+      if (row.delete_flag == 0) {
+        return a+d;
+      }
+      return a+r;
+  }
+
+  var url;
+  function awardPoints(user_id){
+	$("#points_award").textbox("clear");
+    $('#userdlg').dialog({title:'奖励积分'}).dialog('open');
+    url = "${cxt!}/admin/user/awardPoints/"+user_id
+  }
+  
+  function save() {
+	  if (!$("#points_award").textbox('isValid'))
+		  return;
+      $.get(url+"-"+$("#points_award").textbox("getValue") ,function(result){
+        if (result.errorMsg){
+          $.messager.alert( 'Error', result.errorMsg);
+        } else {
+            $('#userdlg').dialog('close');        // close the dialog
+            $('#dg').datagrid('reload');      // reload data
+        }
+      },'json');
+  }
+
+  function markUser(user_id, nick_name, delete_flag) {
+
+      $.messager.confirm('Confirm','确认'+(delete_flag?'删除':'恢复')+'用户【'+nick_name+'】吗?',function(r){
+        if (r){
+            $.get("${cxt!}/admin/user/markUser/"+user_id+"-"+delete_flag ,function(result){
+                if (result.errorMsg){
+                  $.messager.alert( 'Error', result.errorMsg);
+                } else {
+                    $('#dg').datagrid('reload');      // reload data
+                }
+              },'json');
+        }
+      });
+  }
+</script>

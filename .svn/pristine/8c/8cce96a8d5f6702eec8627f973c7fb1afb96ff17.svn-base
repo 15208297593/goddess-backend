@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<sql-statement namespace="manage.scene">
+
+    <sql id="getScenes">
+        <![CDATA[
+            SELECT *
+              FROM scene 
+             WHERE 1=1
+             <% if(!isEmpty(terminal)){ %>
+               AND terminal = ${terminal}
+             <% } %>
+             <% if(!isEmpty(page)){ %>
+               AND page = ${page}
+             <% } %>
+             <% if(!isEmpty(location)){ %>
+               AND location = ${location}
+             <% } %>
+             <% if(!isEmpty(rank)){ %>
+               AND rank = ${rank}
+             <% } %>
+          ORDER BY rank
+        ]]>
+    </sql>
+    
+    <sql id="getRelatedCommodities">
+        <![CDATA[
+            SELECT c.commodity_id,
+                   c.commodity_name,
+                   c.commodity_pic,
+                   c.price,
+                   c.shelve_date,
+                   if(sc.commodity_id is null, '0', '1') as is_selected
+              FROM commodities c
+         LEFT JOIN scene_commodities sc
+                ON c.commodity_id = sc.commodity_id
+               AND sc.scene_id = ?
+             WHERE c.is_shelved = ?
+          ORDER BY c.shelve_date desc
+        ]]>
+    </sql>
+
+    <sql id="getRelatedBrands">
+        <![CDATA[
+            SELECT brand_id,
+                   brand_name,
+                   brand_logo
+              FROM brand
+             WHERE delete_flag = ?
+        ]]>
+    </sql>
+
+</sql-statement>

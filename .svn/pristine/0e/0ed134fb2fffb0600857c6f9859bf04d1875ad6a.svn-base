@@ -1,0 +1,266 @@
+<% var toolbar = { %> 
+    
+  <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-add" onclick="insertAdminUser()">添加新用户</a>
+<%};
+var dialog = { %> 
+<%};
+var datagrid = { %> 
+    <table id="dg">
+    </table>
+<%};
+var dlg_buttons = { %> 
+<%};
+var otherDialogs = { %> 
+<%};
+include("/listLayout.html",
+        {toolbar:toolbar,
+        dialog:dialog, 
+        datagrid:datagrid,
+        dlg_buttons:dlg_buttons,
+        otherDialogs:otherDialogs,
+        dialog_title:""}){}
+%>
+
+<script type="text/javascript">
+
+  $(function(){
+    $('#fm').attr('enctype', 'multipart/form-data');
+    
+    var roles = ${roles};
+    var role_text = {};
+    roles.forEach(function(r) {
+    	role_text[r.code] = r.text;
+    })
+    var brands = [{brand_id:'', brand_name:'无'}];
+    Array.prototype.push.apply(brands, JSON.parse('${brands!}'));
+    $('#dg').datagrid({
+        title:'',
+        iconCls:'icon-edit',
+        width:1000,
+        height:250,
+        singleSelect:true,
+        idField:'user_id',
+        url:'${cxt!}/admin/adminUser/getAdminUsers',
+        columns:[[
+            {field:'user_id',title:'id',width:50},
+            {field:'user_name',title:'用户名称',width:150,
+              editor:{
+                type:'textbox',
+                options:{
+                  required:true,
+                  validType:'maxLength[50]'
+                }
+              }
+            },
+            {field:'password',title:'用户密码',width:300,
+              editor:{
+                type:'textbox',
+                options:{
+                  required:true,
+                  prompt:'请输入英文、数字或者下划线',
+                  type:'password',
+                  validType:['length[6,20]','englishOrNum']
+                }
+              }
+            },
+            {field:'role',title:'用户角色',width:150,
+                editor:{
+                    type:'combobox',
+                    options:{
+                        valueField:'code',
+                        textField:'text',
+                        data:roles,
+                        required:true,
+                        editable:false
+                    }
+                },
+                formatter:function(value){
+                	return role_text[value];
+                }
+            },
+            {field:'brand_id',title:'品牌商',width:150,
+                editor:{
+                    type:'combobox',
+                    options:{
+                        valueField:'brand_id',
+                        textField:'brand_name',
+                        data:brands,
+                        editable:false
+                    }
+                },
+                formatter:function(value){
+                	var name = '';
+                	brands.forEach(function(b){
+                		if (b.brand_id == value) {
+                			name = b.brand_name;
+                			return false;
+                		} 
+                	})
+                    return name;
+                }
+            },
+            {field:'action',title:'操作',width:150,align:'center',
+                formatter:function(value,row,index){
+                    if (row.editing){
+                        var s = '<a href="#" onclick="saveAdminUser(this,'+index+')">保存</a> ';
+                        var c = '<a href="#" onclick="cancelAdminUser(this,'+index+')">取消</a>';
+                        return s+c;
+                    } else {
+                        var e = '<a href="#" onclick="editAdminUser(this,'+index+')">编辑</a> ';
+                        var r = '<a href="#" onclick="resetPass(this,'+index+')">重置密码</a> ';
+                        var d = '<a href="#" onclick="deleteAdminUser(this,'+index+')">删除</a> ';
+                        return e+r+d;
+                    }
+                }
+            }
+        ]],
+        onBeforeEdit:function(index,row){
+            row.editing = true;
+            updateActions(index);
+        },
+        onAfterEdit:function(index,row){
+            row.editing = false;
+            //updateActions(index);
+        },
+        onEndEdit:function(index,row){
+            row.editing = false;
+            //updateActions(index);
+        },
+        
+        onCancelEdit:function(index,row){
+            row.editing = false;
+            updateActions(index);
+        }
+    });
+  });
+  
+
+  function updateActions(index, row, table){
+    var targetTable = $('#dg');
+    if (table) targetTable = $('#' + table);
+    targetTable.datagrid('updateRow',{
+          index: index,
+          row: row ? row : {}
+      });
+  }
+  
+  function getRowIndex(target){
+    var tr = $(target).closest('tr.datagrid-row');
+    return parseInt(tr.attr('datagrid-row-index'));
+  }
+  
+  function resetPass(target, index){
+      $('#dg').datagrid('selectRow',index);
+      $('#dg').datagrid('beginEdit', index);
+      var user_name = $('#dg').datagrid('getEditor', {index:index,field:'user_name'});
+      var role = $('#dg').datagrid('getEditor', {index:index,field:'role'});
+      var brand_id = $('#dg').datagrid('getEditor', {index:index,field:'brand_id'});
+      $(user_name.target).textbox('disable');
+      $(role.target).textbox('disable');
+      $(brand_id.target).textbox('disable');
+      var password = $('#dg').datagrid('getEditor', {index:index,field:'password'});
+      $(password.target).textbox('setValue', '');
+      url = '${cxt!}/admin/adminUser/resetPass';
+  }
+  
+  function editAdminUser(target, index){
+      $('#dg').datagrid('selectRow',index);
+      $('#dg').datagrid('beginEdit', index);
+      var user_name = $('#dg').datagrid('getEditor', {index:index,field:'user_name'});
+      $(user_name.target).textbox('disable');
+      var password = $('#dg').datagrid('getEditor', {index:index,field:'password'});
+      $(password.target).textbox('disable');
+      url = '${cxt!}/admin/adminUser/updateAdminUser';
+  }
+  
+  function deleteAdminUser(target,index){
+    $('#dg').datagrid('selectRow',index);
+    var row = $('#dg').datagrid('getSelected');
+    $.messager.confirm('删除后台用户','确定删除该用户吗?',function(r){
+        if (r){
+            // 删除后台用户
+            $.get('${cxt!}/admin/adminUser/deleteAdminUser/' + row.user_id,
+            function(result){
+              if (result.errorMsg){
+                $.messager.alert( 'Error', result.errorMsg);
+              } else {
+                $('#dg').datagrid('deleteRow', index);
+              }
+            },'json');
+        }
+    });
+  }
+  
+  function saveAdminUser(target,index){
+    // ajax保存
+    $('#dg').datagrid('selectRow',index);
+    var row = $('#dg').datagrid('getSelected');
+    if ($('#dg').datagrid('validateRow', index)) {
+
+      var role = $("tr[datagrid-row-index="+index+"] td[field=role] input[type=hidden]").val();
+      var brand_id = $("tr[datagrid-row-index="+index+"] td[field=brand_id] input[type=hidden]").val();
+      if (role == 2 && !brand_id) {
+          $.messager.alert( 'Error', '品牌商角色请选择所属品牌！');
+          return false;
+      } else {
+          brand_id = '';
+      }
+      $('#dg').datagrid('endEdit', index);
+      if (row.user_id) {
+        // 更新后台用户
+        $.post(url,
+            {user_id:row.user_id,
+        	user_name:row.user_name,
+        	password:row.password,
+        	role:row.role,
+        	brand_id:brand_id},function(result){
+          if (result.errorMsg){
+            $.messager.alert( 'Error', result.errorMsg);
+            $('#dg').datagrid('beginEdit', index);
+          } else {
+              row.password = result.adminUser.password;
+              updateActions(index, row);
+            $('#dg').datagrid('endEdit', index);
+          }
+        },'json');
+      } else {
+        // 添加新后台用户
+        $.post('${cxt!}/admin/adminUser/saveAdminUser',
+            {user_name:row.user_name,
+            password:row.password,
+            role:row.role,
+            brand_id:brand_id},function(result){
+          if (result.errorMsg){
+            $.messager.alert( 'Error', result.errorMsg);
+            $('#dg').datagrid('beginEdit', index);
+          } else {
+            row.user_id = result.adminUser.user_id;
+            row.password = result.adminUser.password;
+            updateActions(index, row);
+          }
+        },'json');
+      }
+    }
+  }
+  
+  function cancelAdminUser(target,index){
+    $('#dg').datagrid('selectRow',index);
+    var row = $('#dg').datagrid('getSelected');
+    if (row.user_id) {
+      $('#dg').datagrid('cancelEdit', index);
+    } else {
+      $('#dg').datagrid('deleteRow', index);
+    }
+  }
+
+  function insertAdminUser(){
+    var index = 0;
+    $('#dg').datagrid('insertRow', {
+        index: index,
+        row:{}
+    });
+    $('#dg').datagrid('selectRow',index);
+    $('#dg').datagrid('beginEdit',index);
+  }
+  
+</script>

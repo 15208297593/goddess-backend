@@ -1,0 +1,546 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<sql-statement namespace="manage.prototype">
+
+    <sql id="all">
+        <![CDATA[
+              FROM prototype
+          ORDER BY delete_flag, prototype_id
+        ]]>
+    </sql>
+
+    <sql id="getAllPrototypes">
+        <![CDATA[
+            SELECT prototype_id as id,
+                   prototype_name as name
+              FROM prototype
+             WHERE delete_flag = 0
+          ORDER BY prototype_id desc
+        ]]>
+    </sql>
+
+    <sql id="getPrototypePics">
+        <![CDATA[
+            SELECT *
+              FROM prototype_pic
+             WHERE prototype_id = ?
+        ]]>
+    </sql>
+    
+    <sql id="checkPrototypeIsUsed">
+        <![CDATA[
+            SELECT u.cell_num,
+                   u.nick_name,
+                   null as commodity_id
+              FROM user_customization uc, users u
+             WHERE uc.user_id = u.user_id
+               AND u.delete_flag = '0'
+               AND uc.customize_status = ?
+               AND uc.prototype_id = ? 
+             LIMIT 1
+        ]]>
+    </sql>
+    <sql id="checkTypeIsUsed">
+        <![CDATA[
+            SELECT u.cell_num,
+                   u.nick_name,
+                   null as commodity_id
+              FROM user_customization uc, customization_properties cp, property_type pt, users u
+             WHERE uc.user_id = u.user_id
+               AND uc.user_customization_id = cp.user_customization_id
+               AND cp.prototype_id = pt.prototype_id
+               AND cp.material_type_id = pt.material_type_id
+               AND u.delete_flag = '0'
+               AND uc.customize_status = ?
+               AND pt.property_type_id = ?
+             LIMIT 1
+        ]]>
+    </sql>
+    
+    <sql id="checkPropertyIsUsed">
+        <![CDATA[
+            SELECT u.cell_num,
+                   u.nick_name,
+                   null as commodity_id
+              FROM user_customization uc, customization_properties cp, property_type pt,properties p, users u
+             WHERE uc.user_id = u.user_id
+               AND uc.user_customization_id = cp.user_customization_id
+               AND cp.prototype_id = pt.prototype_id
+               AND pt.property_type_id = p.property_type_id
+               AND cp.material_id = p.material_id
+               AND u.delete_flag = '0'
+               AND uc.customize_status = ?
+               AND find_in_set(p.property_id, ?) 
+             LIMIT 1
+        ]]>
+    </sql>
+    
+    <sql id="getPropertyTypes">
+        <![CDATA[
+            SELECT mt.material_type_id,
+                   mt.type_name,
+                   mt.exhibition_type,
+                   if (pt.property_type_id IS NULL, 0, 1) as type_selected,
+                   pt.property_type_id,
+                   pt.is_required,
+                   pt.material_amount,
+                   pt.default_material_id
+              FROM material_type mt
+         LEFT JOIN property_type pt 
+                ON mt.material_type_id = pt.material_type_id
+               AND pt.prototype_id = ? 
+             WHERE mt.delete_flag = '0'
+          ORDER BY mt.material_type_id
+        ]]>
+    </sql>
+    
+    <sql id="getProperties">
+        <![CDATA[
+            SELECT m.material_id,
+                   m.material_name,
+                   m.material_exhibition,
+                   m.price_addition,
+                   0 as property_selected
+              FROM materials m
+             WHERE m.material_type_id = ?
+               AND m.delete_flag = '0'
+          ORDER BY m.material_id
+        ]]>
+    </sql>
+    
+    <sql id="getPropertiesWithTypeId">
+        <![CDATA[
+            SELECT m.material_id,
+                   m.material_name,
+                   m.material_exhibition,
+                   m.price_addition,
+                   p.property_id,
+                   if(p.material_id IS NULL, 0, 1) as property_selected
+              FROM materials m
+         LEFT JOIN properties p
+                ON m.material_id = p.material_id
+               AND p.property_type_id = ?
+             WHERE m.material_type_id = ?
+               AND m.delete_flag = '0'
+          ORDER BY m.material_id
+        ]]>
+    </sql>
+    
+    <sql id="getPropertyTypesWithoutSelf">
+        <![CDATA[
+            SELECT mt.material_type_id,
+                   ifnull(pt.type_name, mt.type_name) as type_name
+              FROM property_type pt, material_type mt
+             WHERE pt.material_type_id = mt.material_type_id
+               AND mt.material_type_id <> ?
+               AND pt.prototype_id = ?
+               AND mt.delete_flag = '0'
+          ORDER BY mt.material_type_id
+        ]]>
+    </sql>
+
+    <sql id="getPropertyTypesByPtid">
+        <![CDATA[
+            select 
+                pt.property_type_id,
+                pt.material_type_id,
+                pt.parent_type_id,
+                pt.prototype_id,
+                pt.is_required,
+                pt.default_material_id,
+                pt.material_amount,
+                pt.conflict_type,
+                pt.conflict_alert,
+                pt.rank,
+                ifnull(pt.type_name, mt.type_name) as type_name,
+                ifnull(pt.type_name_ext, mt.type_name_ext) as type_name_ext,
+                mt.exhibition_type
+            from property_type pt
+       left join material_type mt
+              on pt.material_type_id = mt.material_type_id
+           where property_type_id = ?
+        ]]>
+    </sql>
+
+    <sql id="getPropertyTypesByPid">
+        <![CDATA[
+            select 
+			    pt.property_type_id,
+			    pt.material_type_id,
+			    pt.parent_type_id,
+			    pt.prototype_id,
+                pt.conflict_type,
+			    ifnull(pt.type_name, mt.type_name) as type_name,
+			    ifnull(pt.type_name_ext, mt.type_name_ext) as type_name_ext,
+			    mt.type_name as material_type_name,
+			    pt.rank
+			from
+			    property_type pt
+	   left join
+			    material_type mt
+		      on pt.material_type_id = mt.material_type_id
+		   where pt.prototype_id = ?
+		order by pt.rank DESC, pt.property_type_id ASC
+        ]]>
+    </sql>
+
+    <sql id="getBaseAndTypesByPid">
+        <![CDATA[
+          select pt.property_type_id,
+			     pt.prototype_id,
+			     pt.type_name,
+			     pt.type_name_ext,
+			     pt.is_base,
+			     pt.base_ref_type,
+			     mt.type_name as base_type_name,
+			     mt.exhibition_type,
+			     pt.rank
+			from property_type pt
+	   left join property_type bt
+		      on pt.base_ref_type = bt.property_type_id
+	   left join material_type mt
+		      on bt.material_type_id = mt.material_type_id
+		   where pt.prototype_id = ?
+		order by pt.rank DESC, pt.property_type_id
+        ]]>
+    </sql>
+
+    <sql id="getParentTypesByPid">
+        <![CDATA[
+          select pt.property_type_id,
+                 pt.type_name
+            from property_type pt
+           where pt.prototype_id = ?
+             and pt.property_type_id <> ?
+             and pt.parent_type_id is null
+             and pt.material_type_id is null
+        ]]>
+    </sql>
+
+    <sql id="copyPropertyType">
+        <![CDATA[
+            INSERT INTO property_type(prototype_id, is_base, base_ref_type, is_ref, type_name, type_name_ext,is_required,conflict_type,conflict_alert,rank) 
+                 SELECT ?, 
+                        is_base, 
+                        base_ref_type, 
+                        is_ref, 
+                        type_name, 
+                        type_name_ext,
+                        is_required,
+                        conflict_type,
+                        conflict_alert,
+                        rank
+                   FROM property_type
+                  WHERE prototype_id = ?
+        ]]>
+    </sql>
+
+    <sql id="deleteBaseType">
+        <![CDATA[
+       DELETE brt
+         FROM base_relate_type brt
+   INNER JOIN property_type as pt
+        WHERE pt.property_type_id = brt.base_type 
+          AND pt.prototype_id = ?
+        ]]>
+    </sql>
+
+    <sql id="deleteProperties">
+        <![CDATA[
+            DELETE pt, 
+                   p 
+              FROM property_type as pt 
+         LEFT JOIN properties as p 
+                ON pt.property_type_id = p.property_type_id 
+             WHERE pt.prototype_id = ?
+        ]]>
+    </sql>
+
+    <sql id="getPropertyTypeForCopy">
+        <![CDATA[
+            select * 
+              from property_type 
+             where prototype_id = ? 
+          order by is_base DESC
+        ]]>
+    </sql>
+
+    <sql id="copyBaseRelateType">
+        <![CDATA[
+            INSERT INTO base_relate_type(base_type,base_property_id,relate_type,relate_ref_type,price_addition) 
+                 SELECT ? as base_type,
+                        base_property_id, 
+                        ? as relate_type,
+                        relate_ref_type,
+                        price_addition 
+                   FROM base_relate_type 
+                  WHERE base_type = ? 
+                    AND relate_type = ?
+        ]]>
+    </sql>
+
+    <sql id="saveProperty">
+        <![CDATA[
+            INSERT INTO properties(property_type_id, material_id) VALUES(?, ?)
+        ]]>
+    </sql>
+
+    <sql id="savePropertiesWithRank">
+        <![CDATA[
+            INSERT INTO properties(property_type_id, material_id, rank) VALUES(?, ?, ?)
+        ]]>
+    </sql>
+
+    <sql id="deleteProperty">
+        <![CDATA[
+            DELETE FROM properties WHERE property_id IN ${properties}
+        ]]>
+    </sql>
+
+    <sql id="deletePropertiesByType">
+        <![CDATA[
+            DELETE FROM properties WHERE property_type_id = ?
+        ]]>
+    </sql>
+
+    <sql id="deleteCustomizationByType">
+        <![CDATA[
+            DELETE 
+              FROM customization 
+             WHERE prototype_id = ?
+               AND property_key like concat('%_', ?, '@%')
+        ]]>
+    </sql>
+
+    <sql id="deleteCustomizationByProperties">
+        <![CDATA[
+            DELETE 
+              FROM customization 
+             WHERE prototype_id = ?
+               AND property_key like concat('%_', ?, '@', ? ,'_%')
+        ]]>
+    </sql>
+
+    <sql id="getTypeRank">
+        <![CDATA[
+            SELECT CAST(group_concat(material_type_id ORDER BY rank desc) AS CHAR) as rank
+              FROM property_type
+             WHERE prototype_id = ? 
+               AND rank <> 0
+          GROUP BY prototype_id
+          
+        ]]>
+    </sql>
+    
+    <sql id="getPropertyRank">
+        <![CDATA[
+            SELECT CAST(group_concat(material_id ORDER BY rank desc) AS CHAR) as rank
+              FROM properties 
+             WHERE property_type_id = ? 
+               AND rank <> 0
+          GROUP BY property_type_id
+        ]]>
+    </sql>
+
+    <sql id="updateTypeRank">
+        <![CDATA[
+            UPDATE property_type
+               SET rank = ?
+             WHERE property_type_id = ?
+        ]]>
+    </sql>
+
+    <sql id="updatePropertyRank">
+        <![CDATA[
+            UPDATE properties
+               SET rank = ?
+             WHERE property_id = ?
+        ]]>
+    </sql>
+
+    <sql id="getMaterialTypes">
+        <![CDATA[
+            SELECT *
+              FROM material_type
+             WHERE delete_flag = '0'
+        ]]>
+    </sql>
+    
+    <sql id="getPrototypeClassification">
+        <![CDATA[
+            SELECT c.classification_id as id,
+                   c.classification_name as text,
+                   c.classification_level as level,
+                   c.parent_id,
+                   c.category,
+                   pc.prototype_id
+              from classification c
+         LEFT JOIN prototype_classification pc
+                ON pc.classification_id = c.classification_id
+               AND pc.prototype_id = ?
+          ORDER BY category,level,c.rank
+        ]]>
+    </sql>
+
+    <sql id="deleteClassificationByPrototype">
+        <![CDATA[
+            DELETE 
+              FROM prototype_classification
+             WHERE prototype_id = ?
+        ]]>
+    </sql>
+
+    <sql id="addPrototypeClassification">
+        <![CDATA[
+            INSERT INTO prototype_classification (prototype_id, classification_id, brand_id, category)
+                 VALUES (?, ?, ?, ?)
+        ]]>
+    </sql>
+
+    <sql id="updateClassificationBrand">
+        <![CDATA[
+            UPDATE prototype_classification 
+               SET brand_id = ?
+             WHERE prototype_id = ?
+        ]]>
+    </sql>
+    
+    <sql id="refPropertyTypes">
+        <![CDATA[
+              FROM property_type
+             WHERE is_ref = '1'
+        ]]>
+    </sql>
+    
+    <sql id="getMaterialsByPtId">
+        <![CDATA[
+            SELECT m.*,
+                   if(p.property_id is null, '0', '1') as is_checked
+              FROM materials m
+         LEFT JOIN properties p
+                ON m.material_id = p.material_id
+               AND p.property_type_id = ?
+             WHERE m.material_type_id = ? 
+               AND m.delete_flag = '0'
+          ORDER BY p.rank DESC, m.material_id
+        ]]>
+    </sql>
+
+    <sql id="getBaseMaterials">
+        <![CDATA[
+          SELECT m.*,
+                 p.property_id,
+                 p.rank,
+                 pt.relate_types,
+                 pt.price_addition as base_addition
+            FROM materials m,
+                 properties p,
+                 (SELECT p.property_id,
+		                 max(brt.price_addition) as price_addition,
+                         CAST(group_concat(bpt.type_name order by bpt.property_type_id) AS CHAR) as relate_types
+                    FROM property_type rt,
+                         properties p
+               LEFT JOIN base_relate_type brt
+	                  ON brt.base_property_id = p.property_id
+	                 AND brt.base_type = ?
+               LEFT JOIN property_type bpt
+                      on brt.relate_ref_type = bpt.property_type_id
+                   WHERE rt.property_type_id = p.property_type_id
+                     AND rt.property_type_id = ?
+                GROUP BY p.property_id) pt
+            WHERE p.property_id = pt.property_id
+              AND m.material_id = p.material_id
+              AND m.delete_flag = '0'
+         ORDER BY p.rank DESC, m.material_id
+        ]]>
+    </sql>
+
+    <sql id="getBaseRelateType">
+        <![CDATA[
+          SELECT pt.type_name,
+			     pt.type_name_ext,
+			     brt.relate_ref_type,
+			     brt.price_addition
+			FROM property_type pt
+	   LEFT JOIN base_relate_type brt 
+		      ON pt.property_type_id = brt.relate_type
+		     AND brt.base_type = ?
+		     AND brt.base_property_id = ?
+		   WHERE pt.property_type_id = ?
+        ]]>
+    </sql>
+
+    <sql id="getRelateTypes">
+        <![CDATA[
+           SELECT property_type_id,
+                  type_name,
+                  type_name_ext 
+             FROM property_type 
+            WHERE prototype_id = ? 
+              AND is_base = '0'
+        ]]>
+    </sql>
+
+    <sql id="getRelateTypesWithoutSelf">
+        <![CDATA[
+           SELECT property_type_id,
+                  type_name,
+                  type_name_ext 
+             FROM property_type 
+            WHERE prototype_id = ? 
+              AND property_type_id <> ?
+              AND is_base = '0'
+        ]]>
+    </sql>
+
+    <sql id="getBaseRelateTypes">
+        <![CDATA[
+            SELECT distinct base_type,
+                            base_property_id
+              FROM base_relate_type 
+             WHERE base_type = ${base_type}
+               AND relate_type = ${relate_type}
+               AND base_property_id in ${pids} 
+        ]]>
+    </sql>
+
+    <sql id="insertBaseRelateType">
+        <![CDATA[
+            INSERT INTO base_relate_type(base_type,base_property_id,relate_type,relate_ref_type,price_addition) VALUES(?, ?, ?, ?, ?)
+        ]]>
+    </sql>
+    
+    <sql id="updateBaseRelateType">
+        <![CDATA[
+       UPDATE base_relate_type 
+          SET relate_ref_type = ?,
+              price_addition = ?
+        WHERE base_type = ? 
+          AND base_property_id = ? 
+          AND relate_type = ?
+        ]]>
+    </sql>
+
+    <sql id="deleteBaseRelateTypes">
+        <![CDATA[
+       DELETE 
+         FROM base_relate_type 
+        WHERE base_type = ${base_type}
+          AND relate_type = ${relate_type}
+          AND base_property_id in ${pids} 
+        ]]>
+    </sql>
+
+    <sql id="deleteRelateType">
+        <![CDATA[
+       DELETE 
+         FROM base_relate_type 
+        WHERE 
+          <% if(!isEmpty(base_type)){ %>
+            base_type = ${base_type}
+          <% } else if(!isEmpty(relate_type)){ %>
+            relate_type = ${relate_type}
+          <% } %>
+        ]]>
+    </sql>
+</sql-statement>

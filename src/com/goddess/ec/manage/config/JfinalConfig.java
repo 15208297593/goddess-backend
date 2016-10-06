@@ -1,0 +1,230 @@
+package com.goddess.ec.manage.config;
+
+import org.apache.log4j.Logger;
+import org.beetl.core.GroupTemplate;
+
+import com.goddess.ec.manage.beetl.format.DateFormat;
+import com.goddess.ec.manage.beetl.func.EscapeXml;
+import com.goddess.ec.manage.beetl.render.MyBeetlRenderFactory;
+import com.goddess.ec.manage.common.DictKeys;
+import com.goddess.ec.manage.handler.GlobalHandler;
+import com.goddess.ec.manage.interceptor.AuthenticationInterceptor;
+import com.goddess.ec.manage.interceptor.ParamPkgInterceptor;
+import com.goddess.ec.manage.plugin.ControllerPlugin;
+import com.goddess.ec.manage.plugin.I18NPlugin;
+import com.goddess.ec.manage.plugin.PropertiesPlugin;
+import com.goddess.ec.manage.plugin.SqlXmlPlugin;
+import com.goddess.ec.manage.plugin.TablePlugin;
+import com.goddess.ec.manage.thread.ThreadParamInit;
+import com.goddess.ec.manage.thread.ThreadSysLog;
+import com.goddess.ec.manage.tools.ToolString;
+import com.jfinal.config.Constants;
+import com.jfinal.config.Handlers;
+import com.jfinal.config.Interceptors;
+import com.jfinal.config.JFinalConfig;
+import com.jfinal.config.Plugins;
+import com.jfinal.config.Routes;
+import com.jfinal.core.JFinal;
+import com.jfinal.plugin.activerecord.ActiveRecordPlugin;
+import com.jfinal.plugin.activerecord.CaseInsensitiveContainerFactory;
+import com.jfinal.plugin.activerecord.dialect.MysqlDialect;
+import com.jfinal.plugin.activerecord.dialect.OracleDialect;
+import com.jfinal.plugin.activerecord.dialect.PostgreSqlDialect;
+import com.jfinal.plugin.activerecord.tx.TxByMethods;
+import com.jfinal.plugin.activerecord.tx.TxByRegex;
+import com.jfinal.plugin.druid.DruidPlugin;
+import com.jfinal.plugin.ehcache.EhCachePlugin;
+import com.jfinal.plugin.redis.RedisPlugin;
+
+/**
+ * Jfinal API 引导式配置
+ */
+public class JfinalConfig extends JFinalConfig {
+
+	private static Logger log = Logger.getLogger(JfinalConfig.class);
+
+	/**
+	 * 配置常量
+	 */
+	public void configConstant(Constants me) {
+		log.info("configConstant 缓存 properties");
+		new PropertiesPlugin(loadPropertyFile("init.properties")).start();
+		
+		log.info("configConstant 设置字符集");
+		me.setEncoding(ToolString.encoding);
+
+		log.info("configConstant 设置是否开发模式");
+		me.setDevMode(getPropertyToBoolean(DictKeys.config_devMode, false));
+		// me.setViewType(ViewType.JSP);//设置视图类型为Jsp，否则默认为FreeMarker
+
+		log.info("configConstant 视图Beetl设置");
+		me.setMainRenderFactory(new MyBeetlRenderFactory());
+
+//		try {
+//			MyBeetlRenderFactory.groupTemplate.setConf(Configuration.defaultConfiguration());
+//			MyBeetlRenderFactory.groupTemplate.setResourceLoader(new WebAppResourceLoader(PathKit.getWebRootPath()+"/WEB-INF/view/"));
+//		} catch (IOException e) {
+//			e.printStackTrace();
+//		}
+		GroupTemplate groupTemplate = MyBeetlRenderFactory.groupTemplate;
+
+		// groupTemplate.registerFunction("hasPrivilegeUrl", new
+		// HasPrivilegeUrl());
+		// groupTemplate.registerFunction("orderBy", new OrderBy());
+		groupTemplate.registerFunction("escapeXml", new EscapeXml());
+
+		// groupTemplate.registerTag("dict", DictTag.class);
+		// groupTemplate.registerTag("param", ParamTag.class);
+
+		groupTemplate.registerFormat("dateFormat", new DateFormat());
+
+		log.info("configConstant 视图error page设置");
+		me.setError401View("/common/401.html");
+		me.setError403View("/common/403.html");
+		me.setError404View("/common/404.html");
+		me.setError500View("/common/500.html");
+	}
+
+	/**
+	 * 配置路由
+	 */
+	public void configRoute(Routes me) {
+		log.info("configRoute 路由扫描注册");
+		new ControllerPlugin(me).start();
+	}
+
+	/**
+	 * 配置插件
+	 */
+	public void configPlugin(Plugins me) {
+		log.info("configPlugin 配置Druid数据库连接池连接属性");
+		DruidPlugin druidPlugin = new DruidPlugin(
+		        (String) PropertiesPlugin.getParamMapValue(DictKeys.db_connection_jdbcUrl),
+		        (String) PropertiesPlugin.getParamMapValue(DictKeys.db_connection_userName),
+		        (String) PropertiesPlugin.getParamMapValue(DictKeys.db_connection_passWord),
+		        (String) PropertiesPlugin.getParamMapValue(DictKeys.db_connection_driverClass));
+
+		log.info("configPlugin 配置Druid数据库连接池大小");
+		druidPlugin.set((int) PropertiesPlugin.getParamMapValue(DictKeys.db_initialSize),
+		        (int) PropertiesPlugin.getParamMapValue(DictKeys.db_minIdle),
+		        (int) PropertiesPlugin.getParamMapValue(DictKeys.db_maxActive));
+
+		log.info("configPlugin 配置ActiveRecord插件");
+		ActiveRecordPlugin arp = new ActiveRecordPlugin(druidPlugin);
+		// arp.setTransactionLevel(4);//事务隔离级别
+		arp.setDevMode(getPropertyToBoolean(DictKeys.config_devMode, false)); // 设置开发模式
+		arp.setShowSql(getPropertyToBoolean(DictKeys.config_devMode, false)); // 是否显示SQL
+
+		log.info("configPlugin 数据库类型判断");
+		String db_type = (String) PropertiesPlugin.getParamMapValue(DictKeys.db_type_key);
+		if (db_type.equals(DictKeys.db_type_postgresql)) {
+			log.info("configPlugin 使用数据库类型是 postgresql");
+			arp.setDialect(new PostgreSqlDialect());
+
+		} else if (db_type.equals(DictKeys.db_type_mysql)) {
+			log.info("configPlugin 使用数据库类型是 mysql");
+			arp.setDialect(new MysqlDialect());
+			arp.setContainerFactory(new CaseInsensitiveContainerFactory(true));// 小写
+
+		} else if (db_type.equals(DictKeys.db_type_oracle)) {
+			log.info("configPlugin 使用数据库类型是 oracle");
+			druidPlugin.setValidationQuery("select 1 FROM DUAL"); // 指定连接验证语句(用于保存数据库连接池),
+																  // 这里不加会报错误:invalid
+																  // oracle
+																  // validationQuery.
+																  // select 1,
+																  // may should
+																  // be : select
+																  // 1 FROM DUAL
+			arp.setDialect(new OracleDialect());
+			arp.setContainerFactory(new CaseInsensitiveContainerFactory(true));// 配置属性名(字段名)大小写不敏感容器工厂
+		}
+
+		log.info("configPlugin 添加druidPlugin插件");
+		me.add(druidPlugin);
+
+		log.info("configPlugin 表扫描注册");
+		new TablePlugin(arp).start();
+		me.add(arp);
+
+		log.info("I18NPlugin 国际化键值对加载");
+		me.add(new I18NPlugin());
+
+		log.info("EhCachePlugin EhCache缓存");
+		me.add(new EhCachePlugin());
+
+		log.info("SqlXmlPlugin 解析并缓存 xml sql");
+		me.add(new SqlXmlPlugin());
+		
+		log.info("RedisPlugin redis缓存");
+		RedisPlugin goddess = new RedisPlugin("goddess", "localhost"); 
+		me.add(goddess);
+
+//		me.add(new RedisPlugin());
+	}
+
+	/**
+	 * 配置全局拦截器
+	 */
+	public void configInterceptor(Interceptors me) {
+		// log.info("configInterceptor 支持使用session");
+		// me.add(new SessionInViewInterceptor());
+
+		// TODO
+		log.info("configInterceptor 权限认证拦截器");
+		me.add(new AuthenticationInterceptor());
+
+		// TODO
+		log.info("configInterceptor 参数封装拦截器");
+		me.add(new ParamPkgInterceptor());
+
+		// 配置开启事物规则
+		me.add(new TxByMethods("save", "update", "delete"));
+		me.add(new TxByRegex(".*save.*"));
+		me.add(new TxByRegex(".*update.*"));
+		me.add(new TxByRegex(".*delete.*"));
+//		me.add(new TxByActionKeys("/admin/wx/message", "/admin/wx/message/index"));
+	}
+
+	/**
+	 * 配置处理器
+	 */
+	public void configHandler(Handlers me) {
+		// TODO
+		log.info("configHandler 全局配置处理器，主要是记录日志和request域值处理");
+		me.add(new GlobalHandler());
+	}
+
+	/**
+	 * 系统启动完成后执行
+	 */
+	public void afterJFinalStart() {
+		// TODO
+		log.info("afterJFinalStart 缓存参数");
+		new ThreadParamInit().start();
+
+		log.info("afterJFinalStart 启动操作日志入库线程");
+//		ThreadSysLog.startSaveDBThread();
+
+		log.info("afterJFinalStart 系统负载");
+//		TimerResources.start();
+	}
+
+	/**
+	 * 系统关闭前调用
+	 */
+	public void beforeJFinalStop() {
+		log.info("beforeJFinalStop 释放日志入库线程");
+		ThreadSysLog.setThreadRun(false);
+	}
+
+	/**
+	 * 建议使用 JFinal 手册推荐的方式启动项目 运行此 main
+	 * 方法可以启动项目，此main方法可以放置在任意的Class类定义中，不一定要放于此
+	 */
+	public static void main(String[] args) {
+		JFinal.start("WebContent", 8889, "/", 5);
+		// JFinal.start("JfinalUIB/WebContent", 89, "/", 5); // idea
+		// 中运行记得加上当前的module名称
+	}
+}

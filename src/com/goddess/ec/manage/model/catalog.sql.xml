@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<sql-statement namespace="manage.catalog">
+
+    <sql id="getAllCatalog">
+        <![CDATA[
+            select catalog_id as id,
+			       catalog_name as name,
+			       catalog_level as level,
+			       rank,
+			       parent_id
+			  from catalog
+		  order by level,rank
+        ]]>
+    </sql>
+    <!-- 
+    <sql id="getCatagory">
+        <![CDATA[
+            select catalog_id as id,
+			       catalog_name as name,
+			       catalog_level as level,
+			       rank,
+			       parent_id
+			  from catalog
+			 where catalog_level = 0
+		  order by rank
+        ]]>
+    </sql> -->
+
+    <sql id="deleteCatalogs">
+        <![CDATA[
+            delete 
+              from catalog
+             where catalog_id in ${ids}
+        ]]>
+    </sql>
+    
+    <sql id="deleteCommodityCatalogs">
+        <![CDATA[
+            delete 
+              from commodity_catalog
+             where catalog_id in ${ids}
+        ]]>
+    </sql>
+</sql-statement>

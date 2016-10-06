@@ -1,0 +1,58 @@
+<form id="fm" method="post" novalidate enctype='multipart/form-data'>
+<div class="sub-panel">
+
+    <input type="hidden" name="brand_id" id="dlg_brand_id" value="${b.brand_id}"/>
+    <div class="fitem">
+        <label>品牌名称</label>
+        <input id="brand_name" name="brand_name" class="easyui-textbox" required="true" data-options="validType:'maxLength[50]'" value="${b.brand_name}">
+    </div>
+    <div class="fitem">
+        <label>品牌首字母</label>
+        <input id="brand_initial" name="brand_initial" class="easyui-textbox" required="true" data-options="validType:'maxLength[1]'" value="${b.brand_initial}">
+    </div>
+    <div class="fitem">
+        <label>品牌描述（不超过200字）</label>
+        <input name="brand_des" class="easyui-textbox" data-options="validType:'maxLength[200]'" style="width:400px;height:80px" multiline="true" value="${b.brand_des}">
+    </div>
+    <div class="fitem">
+        <div class="float-left"><label>品牌logo</label></div>
+        <div style="margin-left: 110px;">
+            <div style="float:left;padding:10px" class="pic">
+                <input type="file" class="pic" name="brand_logo_file" contentEditable="false" accept="jpg/jpeg/gif" style="display:none" onchange="uploadFile(this)"/>
+                <img alt="" src='${imageUrl!}/${b.brand_logo!"default.jpg"}' style="width:150px;height:auto" id="brand_logo_img" />
+            </div>
+            <a href="javascript:void(0)" class=" easyui-linkbutton c6" iconCls="icon-edit" style="margin:10px" onclick="changeImg(this)" id="btnChange">更改图片</a>
+        </div>
+    </div>
+    <div style="clear:both"></div>
+    <div class="fitem">
+        <div class="float-left"><label>品牌banner</label></div>
+        <div style="margin-left: 110px;">
+            <div style="float:left;padding:10px" class="pic">
+                <input type="file" class="pic" name="brand_banner_file" contentEditable="false" accept="jpg/jpeg/gif" style="display:none" onchange="uploadFile(this)"/>
+                <img alt="" src='${imageUrl!}/${b.brand_banner!"default.jpg"}' style="width:auto;height:100px" id="brand_banner_img" />
+            </div>
+            <a href="javascript:void(0)" class=" easyui-linkbutton c6" iconCls="icon-edit" style="margin:10px" onclick="changeImg(this)" id="btnChange">更改图片</a>
+        </div>
+    </div>
+</div>
+</form>
+<script type="text/javascript">
+
+  function changeImg(obj) {
+    $(obj).prev().children(":first").click();
+  }
+
+  function uploadFile(obj, newFile) {
+    var fi = obj.files[0];
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        if (newFile) {
+          $(obj).after('<img src="" style="width:150px;height:auto" >'+
+                    '<a class="c6" style="margin-left:10px" href="javascript:void(0)" onclick="destroyImg(this)">删除</a>');
+        }
+        $(obj).next().attr('src', e.target.result);
+    };
+    reader.readAsDataURL(fi);
+  }
+</script>

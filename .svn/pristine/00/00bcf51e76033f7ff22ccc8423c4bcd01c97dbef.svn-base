@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<sql-statement namespace="manage.material">
+
+    <sql id="allTypes">
+        <![CDATA[
+              FROM material_type
+        ]]>
+    </sql>
+    
+    <sql id="getMaterialsByType">
+        <![CDATA[
+            SELECT * 
+              FROM materials 
+             WHERE material_type_id = ? 
+        ]]>
+    </sql>
+    
+    <sql id="checkTypeIsUsed">
+        <![CDATA[
+            (
+            SELECT u.cell_num,
+                   u.nick_name,
+                   null as commodity_id
+              FROM user_customization uc, customization_properties cp, users u
+             WHERE uc.user_id = u.user_id
+               AND uc.user_customization_id = cp.user_customization_id
+               AND u.delete_flag = '0'
+               AND uc.customize_status < ?
+               AND cp.material_type_id = ? 
+             LIMIT 1
+            )
+            UNION
+            (
+            SELECT null as cell_num,
+                   null as nick_name,
+                   commodity_id
+              FROM commodities
+             WHERE is_shelved = ?
+               AND property_key LIKE concat('%_', ?, '@%') 
+             LIMIT 1
+            )
+        ]]>
+    </sql>
+    <sql id="checkMaterialIsUsed">
+        <![CDATA[
+            (
+            SELECT u.cell_num,
+                   u.nick_name,
+                   null as commodity_id
+              FROM user_customization uc, customization_properties cp, users u
+             WHERE uc.user_id = u.user_id
+               AND uc.user_customization_id = cp.user_customization_id
+               AND u.delete_flag = '0'
+               AND uc.customize_status < ?
+               AND cp.material_id = ? 
+             LIMIT 1
+            )
+            UNION
+            (
+            SELECT null as cell_num,
+                   null as nick_name,
+                   commodity_id
+              FROM commodities
+             WHERE is_shelved = ?
+               AND property_key LIKE concat('%@', ?, '_%') 
+             LIMIT 1
+            )
+        ]]>
+    </sql>
+    
+    <sql id="deleteCustomizationByType">
+        <![CDATA[
+            DELETE 
+              FROM customization 
+             WHERE property_key like concat('%_', ?, '@%')
+        ]]>
+    </sql>
+
+    <sql id="deleteCustomizationByProperty">
+        <![CDATA[
+            DELETE 
+              FROM customization 
+             WHERE property_key like concat('%_', ?, '@', ? ,'_%')
+        ]]>
+    </sql>
+</sql-statement>

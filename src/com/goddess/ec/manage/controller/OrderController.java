@@ -1,0 +1,700 @@
+package com.goddess.ec.manage.controller;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.time.DateUtils;
+import org.apache.log4j.Logger;
+import org.apache.poi.xssf.usermodel.XSSFCell;
+import org.apache.poi.xssf.usermodel.XSSFRichTextString;
+import org.apache.poi.xssf.usermodel.XSSFRow;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
+import com.alibaba.druid.support.json.JSONUtils;
+import com.goddess.ec.manage.annotation.Controller;
+import com.goddess.ec.manage.common.DictKeys;
+import com.goddess.ec.manage.common.SplitPage;
+import com.goddess.ec.manage.constants.AppConstants;
+import com.goddess.ec.manage.data.Delivery;
+import com.goddess.ec.manage.data.DeliveryResponse;
+import com.goddess.ec.manage.data.DeliveryResult;
+import com.goddess.ec.manage.data.DeliveryRoute;
+import com.goddess.ec.manage.model.Accessory;
+import com.goddess.ec.manage.model.LogoPrint;
+import com.goddess.ec.manage.model.Order;
+import com.goddess.ec.manage.model.OrderStatus;
+import com.goddess.ec.manage.model.User;
+import com.goddess.ec.manage.model.UserCustomization;
+import com.goddess.ec.manage.plugin.PropertiesPlugin;
+import com.goddess.ec.manage.service.AddressService;
+import com.goddess.ec.manage.service.CommodityService;
+import com.goddess.ec.manage.service.CustomizeService;
+import com.goddess.ec.manage.service.MailService;
+import com.goddess.ec.manage.service.OrderService;
+import com.goddess.ec.manage.service.WxService;
+import com.goddess.ec.manage.tools.JacksonHelper;
+import com.goddess.ec.manage.tools.ToolDateTime;
+import com.goddess.ec.manage.tools.ToolSqlXml;
+import com.goddess.ec.manage.tools.ToolUtils;
+import com.goddess.ec.manage.tools.ToolWeb;
+import com.jfinal.aop.Before;
+import com.jfinal.kit.JsonKit;
+import com.jfinal.plugin.activerecord.Db;
+import com.jfinal.plugin.activerecord.Record;
+import com.jfinal.plugin.activerecord.tx.Tx;
+import com.jfinal.upload.UploadFile;
+
+/**
+ * 订单
+ */
+@Controller(controllerKey = "/admin/order")
+public class OrderController extends BaseController {
+
+    @SuppressWarnings("unused")
+    private static Logger log = Logger.getLogger(OrderController.class);
+
+    /**
+     * 订单列表
+     */
+    public void index() {
+    	
+    	setAttr("manufacturers", OrderService.service.getManufacturers());
+    	if (StringUtils.isEmpty(getPara("brand_id"))) {
+    		render("/order/orderList.html");
+    	} else {
+    		setAttr("brand_id", getPara("brand_id")).render("/brand/orderList.html");
+    	}
+    }
+    
+    public void searchOrders() {
+        SplitPage sp = new SplitPage();
+        // 检索页基本设定
+        sp.setPageNumber(getParaToInt("page"));
+        sp.setPageSize(getParaToInt("rows"));
+        sp.setOrderColunm(getPara("sort"));
+        sp.setOrderMode(getPara("order"));
+
+        // 检索条件
+        Map<String, String> queryParam = new HashMap<String, String>();
+        // 订单内部状态
+        queryParam.put("internal_order_status", getPara("internal_order_status"));
+        queryParam.put("cell_num", getPara("cell_num"));
+        queryParam.put("order_id", getPara("order_id"));
+        String orderDateFrom = getPara("order_date_from");
+        String orderDateTo = getPara("order_date_to");
+        if (StringUtils.isNotBlank(orderDateFrom))
+        	queryParam.put("order_date_from", orderDateFrom + " 00:00:00");
+        if (StringUtils.isNotBlank(orderDateTo))
+        	queryParam.put("order_date_to", orderDateTo+" 23:59:59");
+
+    	queryParam.put("brand_id", getPara("brand_id"));
+        // 条件设定
+        sp.setQueryParam(queryParam);
+
+        // 检索处理
+        if (StringUtils.isEmpty(getPara("brand_id"))) {
+        	OrderService.service.getOrders(sp);
+        } else {
+        	OrderService.service.getBrandOrders(sp);
+        }
+
+        Map<String, Object> jsonRes = new HashMap<String, Object>();
+        jsonRes.put("total",  sp.getPage().getTotalRow());
+        jsonRes.put("rows",  sp.getPage().getList());
+        
+        renderJson(jsonRes);
+    }
+    
+    @SuppressWarnings("unchecked")
+	public void getOrderCommodities() {
+    	
+    	String orderId = getPara(0);
+    	Integer brandId = getParaToInt(1);
+    	
+    	List<Record> orderComm = OrderService.service.getOrderCommodities(orderId);
+    	List<Record> filterRecords = new ArrayList<Record>();
+    	for (Record r : orderComm) {
+    		if (brandId != null && OrderService.service.getBrandOrderComms(r.getInt("commodity_id"), r.getInt("user_customization_id"), brandId) == null) continue;
+        	Map<String, Object> baseProperties = (Map<String, Object>)JSONUtils.parse(String.format("{%s}", 
+        			r.getStr("base_properties") == null ? "" : r.getStr("base_properties")));
+        	r.set("base_properties", baseProperties);
+        	// 定制属性
+        	List<Record> customizePros = CommodityService.service.getCommodityCustomizationProps(r.getInt("user_customization_id"), r.getInt("commodity_id"));
+    		// 非定制上架商品的材料属性描述
+    		if ((customizePros == null || customizePros.size() == 0) && StringUtils.isNotEmpty(r.getStr("detail_properties"))) {
+    	    	Map<String, Object> detailProperties = (Map<String, Object>)JSONUtils.parse(String.format("{%s}", r.getStr("detail_properties")));
+    	    	for (String tp : detailProperties.keySet())
+    	    		customizePros.add(new Record().set("type_name", tp).set("material_name", detailProperties.get(tp)));
+    		}
+    		r.set("customize_properties", customizePros);
+
+        	// 商品配饰（内部开格，logo等）
+        	List<Record> accessories =  Db.find(ToolSqlXml.getSql("manage.order.getOrderAccs"), r.getInt("order_commodity_id"));
+    		// 添加内部开格和定制logo选项；高端定制时，在后台生成订单
+    		List<Record> insideSlots = new ArrayList<Record>();
+    		List<Record> logoStyles = new ArrayList<Record>();
+    		for (Record acc : accessories) {
+    			if (AppConstants.ACCESSORY_SLOT.equals(acc.getStr("accessory_type"))) {
+    				insideSlots.add(acc);
+    			} else if (AppConstants.ACCESSORY_LOGO.equals(acc.getStr("accessory_type"))) {
+    				logoStyles.add(acc);
+    			}
+    		}
+    		r.set("inside_slot", insideSlots);
+    		r.set("logo_style", logoStyles);
+    		filterRecords.add(r);
+    	}
+
+    	setAttr("order_commodities", filterRecords);
+    	render("/order/orderCommodities.html");
+    }
+    
+    /**
+     * 给生产商下单生产,发送订单邮件（/order/orderToManufacturer/{order_id}-{manufacturer_id}）
+     */
+    @Before(Tx.class)
+    public void orderToManufacturer() {
+    	// 更新订单状态
+    	if (Db.update(ToolSqlXml.getSql("manage.order.orderToManufacturer"), 
+    			AppConstants.INTERNAL_ORDER_STATUS_AWAIT_DELIVERY_TO_CUSTOMER, getPara(0), AppConstants.INTERNAL_ORDER_STATUS_AWAIT_ORDER_TO_MANUFACTURER) != 1) {
+
+    		setAttr("errorMsg", "订单状态已更新，请确认！");
+        	renderJson(new String[]{"errorMsg"});
+        	return;
+    	}
+    	
+    	OrderService.service.updateOrderManufacturer(getParaToInt(1), getPara(0));
+		// 给生产商发邮件
+		try {
+			MailService.service.sendMail(getRequest(),getPara(0), getParaToInt(1));
+		} catch (Exception e) {
+			e.printStackTrace();
+    		setAttr("errorMsg", "邮件发送失败！");
+		}
+    	renderJson(new String[]{"errorMsg"});
+    }
+    
+    /**
+     * 修改物流信息
+     * @throws IOException
+     */
+    @Before(Tx.class)
+    public void updateDeliveryInfo() throws IOException {
+
+    	updateDelivery(true);
+    	renderJson(new String[]{"errorMsg"});
+    }
+
+    @Before(Tx.class)
+    public void deliveryToCustomer() throws IOException {
+    	
+    	updateDelivery(true);
+    	renderJson(new String[]{"errorMsg"});
+    }
+    
+    private void updateDelivery(boolean updateOrderStatus) throws IOException {
+
+    	// 发起物流订阅
+    	String from = getPara("from_city");
+    	String to = getPara("to_city");
+    	String deliveryCom = getPara("delivery_com_no");
+    	String deliveryNo = getPara("delivery_no");
+    	String orderId = getPara(0);
+    	
+    	Delivery delivery = new Delivery();
+    	DeliveryRoute dr = new DeliveryRoute();
+    	delivery.getLastResult().getData().add(dr);
+    	dr.setFtime(ToolDateTime.format(ToolDateTime.getNow(), ToolDateTime.pattern_ymd_hms));
+    	DeliveryResult dre = delivery.getLastResult();
+    	dre.setNu(deliveryNo);
+    	dre.setCom(deliveryCom);
+    	if (AppConstants.DELIVERY_COM_SF.equals(deliveryCom)) {
+    		
+    		Order eOrder = Order.dao.findFirst(ToolSqlXml.getSql("manage.order.isDeliveryNoExists"), deliveryCom, deliveryNo);
+        	if (eOrder != null && !orderId.equals(eOrder.getStr("order_id"))) {
+        		setAttr("errorMsg", "顺丰快递单号已被订单【"+eOrder.getStr("order_id")+"】使用！");
+    			return;
+        	}
+    		dr.setContext(PropertiesPlugin.getParamMapValue(DictKeys.delivery_sf_start).toString());
+    		DeliveryResponse resp = OrderService.service.pollDelivery(getPara(0), deliveryCom, deliveryNo, from, to);
+    		if (!resp.getResult()) {
+        		setAttr("errorMsg", resp.getMessage());
+    			return;
+    		}
+    	} else if (AppConstants.DELIVERY_COM_NS.equals(deliveryCom)) {
+    		dr.setContext(PropertiesPlugin.getParamMapValue(DictKeys.delivery_ns_start).toString());
+    	// 关联订单
+    	} else if (AppConstants.DELIVERY_COM_REFER.equals(deliveryCom)) {
+//    		Order.dao.findById(getPara(0)).set("delivery_order_id", getPara("delivery_order_id")).update();
+    		
+    		if (Order.dao.findById(getPara("delivery_order_id")) == null) {
+    			setAttr("errorMsg", "物流关联订单号不存在！");
+    		} else {
+    			// 更新订单物流信息及订单状态
+    			Db.update(ToolSqlXml.getSql("manage.order.updateDeliveryReferOrder"), getPara("delivery_order_id"), orderId);
+    		}
+    		return;
+    	}
+
+    	// 更新订单状态
+    	Order o = Order.dao.findById(orderId);
+    	o.set("delivery_com_no", deliveryCom).set(
+			"delivery_no", deliveryNo).set(
+			"delivery_info", delivery.toString());
+		if (updateOrderStatus) {
+			o.set("order_status", OrderStatus.SHIPPED.getCode()).set(
+			"internal_order_status", AppConstants.INTERNAL_ORDER_STATUS_AWAIT_SIGN);
+		}
+		o.update();
+    }
+    
+    /**
+     * 客户签收订单
+     */
+    public void signForCommodity() {
+    	Order o = Order.dao.findById(getPara(0));
+    	// 自配送物流，加入客户签收的路由信息
+    	if (AppConstants.DELIVERY_COM_NS.equals(getPara(1))) {
+    		Delivery d = JacksonHelper.fromJSON(o.getStr("delivery_info"), Delivery.class);
+    		d.setStatus("shutdown");
+        	DeliveryRoute dr = new DeliveryRoute();
+        	dr.setFtime(ToolDateTime.format(ToolDateTime.getNow(), ToolDateTime.pattern_ymd_hms));
+        	dr.setContext(PropertiesPlugin.getParamMapValue(DictKeys.delivery_ns_finish).toString());
+    		d.getLastResult().getData().add(0, dr);
+    		o.set("delivery_info", d.toString());
+    	}
+    	if (!o.set("order_status", OrderStatus.SUCCESS.getCode()).set(
+    			"internal_order_status", AppConstants.INTERNAL_ORDER_STATUS_FINISHED).update())
+    		setAttr("errorMsg", "状态更新失败！");
+    	renderJson(new String[]{"errorMsg"});
+    }
+    
+    /**
+     * 开始高端定制
+     */
+    public void startHighendCus() {
+    	Order.dao.findById(getPara(0)).set("order_status", OrderStatus.HIGHEND_CUSTOMIZING.getCode()).set(
+    			"internal_order_status", AppConstants.INTERNAL_ORDER_STATUS_HIGHEND_CUSTOMIZING).update();
+    	renderJson(new String[]{"errorMsg"});
+    }
+    
+    /**
+     * 初始化高端定制页面
+     */
+    public void initHighendCustomization() {
+    	
+    	String orderId = getPara(0);
+    	Record userCus = Db.findFirst(ToolSqlXml.getSql("manage.order.getHighendCustomization"), orderId);
+    	int userCustomizationId = userCus.getInt("user_customization_id");
+    	// 所有可选原材料类别
+    	List<Record> allTypeAndMaterial = Db.find(ToolSqlXml.getSql("manage.customize.getMaterialCombination"), AppConstants.MATERIAL_EXHIBITION_TYPE_COLOR,
+    			PropertiesPlugin.getParamMapValue(DictKeys.image_url));
+    	
+    	Map<Integer, List<Record>> allMaterials = new HashMap<Integer, List<Record>>();
+    	List<Record> typeAndMaterial = new ArrayList<Record>();
+    	for (Record r : allTypeAndMaterial) {
+    		List<Record> ms = allMaterials.get(r.getInt("material_type_id"));
+    		if (ms == null) {
+    			ms = new ArrayList<Record>();
+    			typeAndMaterial.add(new Record().set("material_type_id", r.get("material_type_id")).set(
+    										"type_name", r.get("type_name")).set(
+											"exhibition_type", r.get("exhibition_type")).set(
+    										"materials", ms));
+    			allMaterials.put(r.getInt("material_type_id"), ms);
+    		}
+    		ms.add(new Record().set("material_id", r.get("material_id")).set(
+    				"material_name", r.get("material_name")).set(
+    				"material_exhibition", r.get("material_exhibition")));
+    	}
+    	
+    	// 已选定制属性
+    	List<Record> cusPros = OrderService.service.getCustomizationPros(userCustomizationId);
+    	Map<String, Map<String, Record>> cusProMap = new HashMap<String, Map<String, Record>>();
+    	for (Record r : cusPros) {
+    		String typeId = r.getInt("material_type_id").toString();
+    		Map<String, Record> materials = cusProMap.get(typeId);
+    		if (materials == null) {
+    			materials = new HashMap<String, Record>();
+    			cusProMap.put(r.getInt("material_type_id").toString(), materials);
+    		}
+    		materials.put(r.getInt("material_id").toString(), r);
+    	}
+    	
+    	// 订单配饰
+    	List<Record> orderAccessories = Db.find(ToolSqlXml.getSql("manage.order.getOrderAccs"), userCus.getInt("order_commodity_id"));
+    	Map<String, Record> orderSlots = new HashMap<String, Record>();
+    	Map<String, Record> orderLogos = new HashMap<String, Record>();
+    	for (Record r : orderAccessories) {
+    		String type = r.getStr("accessory_type");
+    		if (AppConstants.ACCESSORY_SLOT.equals(type)) {
+    			orderSlots.put(r.getStr("accessory_name"), r);
+    		} else if (AppConstants.ACCESSORY_LOGO.equals(type)) {
+    			orderLogos.put(r.getStr("accessory_name"), r);
+    		}
+    	}
+    	setAttr("order_slots", orderSlots);
+    	setAttr("order_logos", orderLogos);
+
+    	List<Record> logoPrints = Db.find(ToolSqlXml.getSql("manage.logoPrint.getLogoPrintByType"));
+    	for (Record lp : logoPrints) {
+			String[] allIds = lp.getStr("all_id").split(",");
+			String[] allNames = lp.getStr("all_name").split(",");
+			String[] allPrices = lp.getStr("all_price").split(",");
+			String[] allPics = lp.getStr("all_pic").split(",");
+			lp.remove("all_id", "all_name", "all_price", "all_pic");
+			List<Record> allLogos = new ArrayList<Record>();
+			for (int i = 0; i < allIds.length; i++) {
+				Record logo = new Record();
+				logo.set("id", allIds[i]);
+				logo.set("name", allNames[i]);
+				logo.set("price", allPrices[i]);
+				logo.set("pic", allPics[i]);
+				allLogos.add(logo);
+			}
+			lp.set("all_logos", allLogos);
+		}
+    	
+    	List<Record> slots = Db.find(ToolSqlXml.getSql("manage.accessory.getAccessoriesByType"), AppConstants.ACCESSORY_SLOT);
+    	setAttr("accessory_type_slot", AppConstants.ACCESSORY_SLOT);
+    	setAttr("accessory_type_logo", AppConstants.ACCESSORY_LOGO);
+    	setAttr("slots", slots);
+    	setAttr("logos", logoPrints);
+    	
+    	// 定制图片（用户上传图片，设计师设计图片）
+    	List<Record> customizationPics = OrderService.service.getCustomizationPics(userCustomizationId);
+    	List<Record> designPics = new ArrayList<Record>();
+    	List<Record> userUploads = new ArrayList<Record>();
+    	int maxRank = 0;
+    	for (Record r : customizationPics) {
+    		String picType = r.getStr("pic_type");
+    		if (AppConstants.CUSTOMIZATION_PIC_TYPE_DESIGN.equals(picType)) {
+    			designPics.add(r);
+    			maxRank = r.getInt("rank");
+    		} else if (AppConstants.CUSTOMIZATION_PIC_TYPE_USER_UPLOAD.equals(picType)) {
+    			userUploads.add(r);
+    		}
+    	}
+    	setAttr("userUploads", userUploads);
+    	setAttr("designPics", designPics);
+    	setAttr("designPicsRankMax", maxRank);
+    	
+    	setAttr("tags", userCus.getStr("customize_tags"));
+    	
+    	setAttr("userCus", userCus);
+    	setAttr("typeAndMaterial", typeAndMaterial);
+    	setAttr("cusProMap", cusProMap);
+    	setAttr("addressTree", AddressService.addrTree.get("中国"));
+    	setAttr("addressTreeJson", JsonKit.toJson(AddressService.addrTree.get("中国")));
+    	render("/order/highendCustomization.html");
+    }
+    
+    /**
+     * 更新高端定制
+     * @throws IOException 
+     */
+    @Before(Tx.class)
+    public void updateHighend() throws IOException {
+
+    	updateHighendCustomization(false);
+    }
+    
+    /**
+     * 高端定制页面，提交form数据保存
+     * 
+     * 参数说明：
+     * cover_pic:封面图片，保存为订单商品图片
+     * 
+     * @param isSave
+     * @throws IOException 
+     */
+    private void updateHighendCustomization(boolean isSave) throws IOException {
+
+    	List<UploadFile> upFiles = getFiles();
+    	String orderId = getPara("order_id");
+    	Order o = Order.dao.findById(orderId);
+        o.set("consignee_name", getPara("consignee_name")).set(
+				"consignee_telephone", getPara("consignee_telephone")).set(
+				"province_first_stage_name", getPara("province_first_stage_name")).set(
+				"address_city_second_stage_name", getPara("address_city_second_stage_name")).set(
+				"address_counties_third_stage_name", getPara("address_counties_third_stage_name")).set(
+				"address_detail_info", getPara("address_detail_info"));
+        
+    	Record userCus = Db.findFirst(ToolSqlXml.getSql("manage.order.getHighendCustomization"), orderId);
+    	int userCustomizationId = userCus.getInt("user_customization_id");
+    	int orderCommodityId = userCus.getInt("order_commodity_id");
+
+    	UserCustomization uc = UserCustomization.dao.findById(userCustomizationId, "user_customization_id");
+    	// 取得所有原材料类别
+    	List<Record> allTypes = Db.find(ToolSqlXml.getSql("manage.customize.getAllMaterialTypes"), AppConstants.DELETE_FLAG_VALID);
+    	Set<String> sType = new HashSet<String>();
+    	for (Record r : allTypes) {
+    		String type = getPara("type_"+r.getInt("material_type_id"));
+    		if (StringUtils.isEmpty(type)) continue;
+    		sType.add(type);
+    	}
+    	
+    	List<Record> cusPros = new ArrayList<Record>();
+    	List<Record> orderAccs = new ArrayList<Record>();
+    	Map<String, String> params = ToolWeb.getParamMap(getRequest());
+    	for (String key : params.keySet()) {
+    		if (key.startsWith("material_")) {
+    			String[] tm = key.split("_");
+    			Integer materialTypeId = Integer.valueOf(tm[1]);
+    			if (sType.contains(tm[1])) {
+    				cusPros.add(new Record().set("user_customization_id", userCustomizationId).set(
+												"prototype_id", null).set(
+    											"material_type_id", materialTypeId).set(
+    											"material_id", Integer.valueOf(tm[2])));
+    			}
+			// 删除定制图片
+    		} else if (key.startsWith("delete_customization_pic_") && AppConstants.DELETE_FLAG_INVALID.equals(params.get(key))) {
+				Db.deleteById("customization_pic", key.replace("delete_customization_pic_", ""));
+			// 删除配饰
+			} else if (key.startsWith("slot_")) {
+				orderAccs.add(Accessory.dao.findById(key.replace("slot_", "")).toRecord().set("order_commodity_id", orderCommodityId).remove("accessory_id"));
+			} else if (key.startsWith("logo_print_")) {
+				LogoPrint lp = LogoPrint.dao.findById(key.replace("logo_print_", ""));
+				orderAccs.add(new Record().set("order_commodity_id", orderCommodityId).set(
+												"accessory_name", lp.get("logo_name")).set(
+												"accessory_type", AppConstants.ACCESSORY_LOGO).set(
+												"accessory_price", lp.get("logo_price")).set(
+												"accessory_pic", lp.get("logo_pic")));
+//			// 更新配饰价格
+//			} else if (key.startsWith("accessory_price_")) {
+//				Db.update("prototype_accessory", "accessory_id", new Record().set("accessory_id", Integer.valueOf(key.replace("accessory_price_", ""))).set(
+//											"accessory_price", StringUtils.isEmpty(params.get(key)) ? 0 : Integer.valueOf(params.get(key))));
+			}
+    	}
+    	// 删除原有订单配饰
+    	CustomizeService.service.deleteOrderAccs(orderCommodityId);
+    	// 删除原有定制属性
+    	CustomizeService.service.deleteCustomizationProperties(userCustomizationId);
+    	
+    	// 保存新定制属性
+    	CustomizeService.service.saveCustomizationProperties(cusPros);
+    	// 保存新订单配饰
+    	CustomizeService.service.saveOrderAccessories(orderAccs);
+    	// 上传图片，保存新配饰，返回封面图片
+    	String coverPicUrl = uploadPic(upFiles, userCustomizationId, userCus.getInt("user_id"), orderId);
+    	// 后台设计输入价格
+    	int price = getParaToInt("price", 0);
+
+    	Record orderCommodity = new Record().set("commodity_pic", coverPicUrl).set(
+								    			"order_commodity_id", orderCommodityId).set(
+    											"price", price).set(
+												"logo_content", getPara("logo_content")).set(
+    											"commodity_name", getPara("customize_name")).set(
+    											"base_properties", getPara("base_properties")).set(
+												"purchase_amount", getParaToInt("purchase_amount", 1));
+    	// 更新订单商品
+    	Db.update("order_commodities", "order_commodity_id", orderCommodity);
+    	uc.set("customize_date", ToolDateTime.getNow()).set(
+    			"custome_pic", coverPicUrl).set(
+    			"customize_des", getPara("customize_des")).set(
+				"customize_name", getPara("customize_name")).set(
+				"base_properties", getPara("base_properties")).set(
+				"price", price);
+    	if (isSave) {
+    		uc.set("customize_status", AppConstants.CUSTOMIZE_STATUS_FINISHED);
+    		// 定制结束，生成支付金额，自由设计的订单不在2小时后被取消
+            o.set("settle_trade_no", String.valueOf(ToolDateTime.getDateByTime())).set(//结算单号
+//        		"order_status", OrderStatus.UNPAID.getCode()).set(//不设置为未支付
+				"internal_order_status", AppConstants.INTERNAL_ORDER_STATUS_HIGHEND_UNSETTLE).set(
+				"order_date", ToolDateTime.getNow()).set(
+    			"order_amount", price).set(
+				"wx_attach", null).set(// 清空wx_attach
+    			"fee_type", getPara("fee_type", "CNY")).set(
+    			"freight", getParaToInt("freight", 0));
+    	} else {
+    	}
+    	
+    	uc.update();
+    	o.update();
+    	renderJson(new String[]{});
+    }
+    
+    /**
+     * 上传定制图片，开格，logo
+     * @param upFiles
+     * @param userCustomizationId
+     * @param userId
+     * @param orderId
+     * @return
+     * @throws IOException
+     */
+    private String uploadPic(List<UploadFile> upFiles, int userCustomizationId, int userId, String orderId) throws IOException {
+
+    	String coverPic = getPara("cover_pic");
+    	String coverPicUrl = coverPic;
+    	// 1.添加图片
+    	for (UploadFile f : upFiles) {
+			String picType = f.getParameterName();
+			String saveURL = ToolUtils.saveUploadFile(f, AppConstants.RELATIVE_PATH_ORDER + orderId, 
+					picType.substring(0, picType.lastIndexOf("_")), ToolUtils.getExtension(f.getOriginalFileName()));
+			if (picType.startsWith("design_pic_")) {
+				String rank = picType.substring(picType.lastIndexOf("_")+1);
+				Record cp = new Record().set("user_customization_id", userCustomizationId).set(
+											"pic_type", AppConstants.CUSTOMIZATION_PIC_TYPE_DESIGN).set(
+											"pic_url", saveURL).set(
+											"rank", StringUtils.isBlank(rank) ? 0 : Integer.valueOf(rank));
+				Db.save("customization_pic", cp);
+	    		if (coverPic.equals(rank)) {
+	    			coverPicUrl = saveURL;
+	    		}
+			}
+    	}
+    	return coverPicUrl;
+    }
+    
+    /**
+     * 生成高端定制订单，用户进行结算支付
+     * @throws IOException 
+     */
+    @Before(Tx.class)
+    public void saveHighendCusOrder() throws IOException {
+    	updateHighendCustomization(true);
+    }
+    
+    /**
+     * 取消高端定制 {order_id}-{apply_refund_fee}
+     * 
+     * @throws Exception 
+     */
+    @Before(Tx.class)
+    public void cancelHighendCusOrder() {
+    	
+    	// 更新订单状态
+    	Order.dao.findById(getPara(0)).set("internal_order_status", AppConstants.INTERNAL_ORDER_STATUS_DEPOSIT_CANCEL).set(
+    										"order_status", OrderStatus.CANCEL).set(
+											"cancel_date", ToolDateTime.getNow()).set(
+    										"apply_refund_fee", getPara(1)).update();
+    	renderJson(new String[]{});
+    }
+    
+    /**
+     * 订单取消退款
+     * 
+     * @throws Exception 
+     */
+    public void cancelRefund() throws Exception {
+    	
+    	renderJson(new String[]{WxService.service.cancelRefund(getPara(0), getParaToInt(1))});
+    }
+    
+    /**
+     * 生成顺丰发货批量订单
+     * @throws IOException 
+     */
+    public void exportSfBatchOrder() throws IOException {
+    	
+    	String[] header = new String[]{"consignee_name","consignee_telephone","company",
+    			"province_first_stage_name","address_city_second_stage_name","address_counties_third_stage_name","address_detail_info",
+    			"content","quantity","weight","num","order_id","order_date"};
+    	List<Order> orders = Order.dao.find("select *,'' as company, '女包' as content, 1 as quantity, 1 as weight, 1 as num from orders where internal_order_status = ? order by order_date desc", AppConstants.INTERNAL_ORDER_STATUS_AWAIT_DELIVERY_TO_CUSTOMER);
+    	XSSFWorkbook wb = null;
+    	FileOutputStream os = null;
+		try {
+			wb = new XSSFWorkbook(new FileInputStream(new File(DictKeys.class.getClassLoader().getResource("/").getPath(),"sf_batchOrderModel.xlsx")));
+	    	XSSFSheet sheet = wb.getSheetAt(0);
+	    	for (int i = 0; i < orders.size(); i++) {
+	    		Order o = orders.get(i);
+	    		XSSFRow row = sheet.createRow(i+1);
+	    		
+	    		for (int col = 0; col < header.length; col++) {
+		    		XSSFCell cell = row.createCell(col);
+		    		cell.setCellValue(new XSSFRichTextString(o.get(header[col]).toString()));
+	    		}
+	    	}
+	    	File output = new File(DictKeys.path_root, "upload/"+ToolDateTime.getNowStr()+"_sf_batchOrderModel.xlsx");
+	    	os = new FileOutputStream(output);
+	        wb.write(os);
+	    	renderFile(output);
+		} catch (IOException e) {
+			throw e;
+		} finally {
+			if (os != null) os.close();
+			if (wb != null) wb.close();
+		}
+    }
+    /**
+     * 生成顺丰发货批量订单
+     * @throws IOException 
+     */
+    public void exportSuoyuUser() throws IOException {
+    	
+        String orderDateFrom = "2015-08-08";//getPara("order_date_from");
+        String orderDateTo = "2015-08-12";//getPara("order_date_to");
+    	String[] header = new String[]{"real_cell_num","cell_num","register_date"};
+    	
+    	Timestamp from = ToolDateTime.getSqlTimestamp(ToolDateTime.parse(orderDateFrom, ToolDateTime.pattern_ymd));
+    	Timestamp to = ToolDateTime.getSqlTimestamp(ToolDateTime.parse(orderDateTo, ToolDateTime.pattern_ymd));
+    	while (from.compareTo(to) <= 0) {
+    		
+    		String fromStr = ToolDateTime.format(from, ToolDateTime.pattern_ymd);
+	    	List<User> users = User.dao.find("select cell_num as real_cell_num,concat(substring(cell_num, 1, 3), '****', substring(cell_num, 8)) as cell_num,register_date from users where register_date >= ? and register_date <= ? order by register_date", fromStr+" 00:00:00", fromStr + " 23:59:59");
+	    	from = ToolDateTime.getSqlTimestamp(DateUtils.addDays(from, 1));
+	    	XSSFWorkbook wb = null;
+	    	FileOutputStream os = null;
+	    	try {
+	    		wb = new XSSFWorkbook(new FileInputStream(new File(DictKeys.class.getClassLoader().getResource("/").getPath(),"suoyu_user.xlsx")));
+	    		XSSFSheet sheet = wb.getSheetAt(0);
+//	    		int limit = 50;
+	    		for (int i = 0; i < users.size(); i++) {
+	    			
+	    			User u = users.get(i);
+	    			XSSFRow row = sheet.createRow(i+1);
+	    			
+	    			for (int col = 0; col < header.length; col++) {
+	    				XSSFCell cell = row.createCell(col);
+	    				cell.setCellValue(new XSSFRichTextString(u.get(header[col]).toString()));
+	    			}
+//	    			if (limit-- > 0) break;
+	    		}
+	    		File output = new File("/Users/bighua/Documents/ps/"+fromStr+"_users.xlsx");
+	    		os = new FileOutputStream(output);
+	    		wb.write(os);
+//	    		renderFile(output);
+	    	} catch (IOException e) {
+	    		throw e;
+	    	} finally {
+	    		if (os != null) os.close();
+	    		if (wb != null) wb.close();
+	    	}
+    	}
+    }
+    
+    @Before(Tx.class)
+    public void delTestData() {
+    	
+    	String cellNum = getPara(0);
+    	
+    	// 获取用户id
+    	Record r = Db.findFirst("select user_id from users where cell_num = ?", cellNum);
+    	Integer userId = r.getInt("user_id");
+    	if (r.getInt("user_id") != null) {
+    		// 删除用户定制商品订单
+    		int count = Db.update("delete o,oc,uc,cp FROM orders o, order_commodities oc, user_customization uc, customization_properties cp where o.order_id = oc.order_id and oc.user_customization_id = uc.user_customization_id and uc.user_customization_id = cp.user_customization_id and payer_id = ?", 
+    					userId);
+    		System.out.println("删除用户定制商品订单相关条数："+count);
+    		// 删除其他订单及商品
+    		count = Db.update("delete o,oc FROM orders o, order_commodities oc where o.order_id = oc.order_id and payer_id = ?", 
+    				userId);
+    		System.out.println("删除其他商品订单相关条数："+count);
+    	} else {
+    		setAttr("errorMsg", "此手机号的用户不存在！");
+    	}
+    	setAttr("userId", userId);
+    	renderJson(new String[]{"errorMsg", "userId"});
+    }
+}

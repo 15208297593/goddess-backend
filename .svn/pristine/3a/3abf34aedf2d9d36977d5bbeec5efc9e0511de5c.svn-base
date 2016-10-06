@@ -1,0 +1,139 @@
+package com.goddess.ec.manage.constants;
+
+public class AppConstants {
+	
+    public static String SESSION_KEY = "__SESSION__";
+
+    /** 结果 */
+    public static int NG = 0;
+    public static int OK = 1;
+
+    /** 用户种别 */
+    public static String USER_TYPE_NORMAL = "0";
+    public static String USER_TYPE_MANAGER = "1";
+
+    /** 订单状态 */
+//    public static String ORDER_STATUS_DEPOSIT_PAID = "!"; // 已支付订金
+//    public static String ORDER_STATUS_UNPAID = "0"; // 未支付
+//    public static String ORDER_STATUS_UNSHIPPED = "1"; // 未发货
+//    public static String ORDER_STATUS_SHIPPED = "2"; // 已发货
+//    public static String ORDER_STATUS_SUCCESS = "3"; // 已收货/交易完成
+//    public static String ORDER_STATUS_CANCEL = "4"; // 已取消
+//    public static String ORDER_STATUS_RETURNED = "5"; // 已退货
+
+    /** 内部订单状态(管理后台查询订单时传递的参数) */
+    public static String INTERNAL_ORDER_STATUS_UNPAID = "0"; // 未支付
+    public static String INTERNAL_ORDER_STATUS_AWAIT_ORDER_TO_MANUFACTURER = "1"; // 待发货给生产商
+    public static String INTERNAL_ORDER_STATUS_AWAIT_DELIVERY_TO_CUSTOMER = "2"; // 待发货给客户
+    public static String INTERNAL_ORDER_STATUS_AWAIT_SIGN = "3"; // 待客户签收
+    public static String INTERNAL_ORDER_STATUS_AWAIT_CONFIRM = "E"; // 待客户确认
+    public static String INTERNAL_ORDER_STATUS_FINISHED = "4"; // 客户已签收
+    public static String INTERNAL_ORDER_STATUS_DELIVERY_ERROR = "5"; // 物流错误
+    public static String INTERNAL_ORDER_STATUS_PAY_ERROR = "6"; // 支付错误
+    public static String INTERNAL_ORDER_STATUS_DEPOSIT_PAID = "7"; // 已支付订金，待接入高端定制
+    public static String INTERNAL_ORDER_STATUS_HIGHEND_CUSTOMIZING = "8"; // 高端定制中
+    public static String INTERNAL_ORDER_STATUS_HIGHEND_UNSETTLE = "F"; // 高端定制完成，待结算
+    public static String INTERNAL_ORDER_STATUS_CANCEL = "9"; // 用户取消订单
+    public static String INTERNAL_ORDER_STATUS_DELETED = "A"; // 已删除
+    public static String INTERNAL_ORDER_STATUS_EXPIRED = "B"; // 已过期（过期未支付）
+    public static String INTERNAL_ORDER_STATUS_DEPOSIT_CANCEL = "C"; // 取消订金订单
+    public static String INTERNAL_ORDER_STATUS_CANCEL_REFUND = "D"; // 取消订单退款
+    
+    /** 删除FLAG */
+    public static String DELETE_FLAG_VALID = "0";
+    public static String DELETE_FLAG_INVALID = "1";
+    
+    /** 商品顶级类别 */
+    public static String CATEGORY_BAG = "1";// 包袋
+    public static String CATEGORY_ACCESSORY = "2";// 配饰
+    
+    /** 收藏类别 */
+    public static String COLLECTION_TYPE_COMMODITY = "1";// 商品
+    public static String COLLECTION_TYPE_BRAND = "2";// 品牌
+    
+    /** 商品图片类型 */
+    public static String COMMODITY_PIC_TYPE_DETAIL = "1";
+    public static String COMMODITY_PIC_TYPE_CAROUSEL = "2";
+
+    /** 商品是否上架 */
+    public static String IS_SHELVED_ON = "1";
+    public static String IS_SHELVED_OFF = "0";
+
+    /** 用户定制状态 */
+    public static String CUSTOMIZE_STATUS_UNFINISHED = "0";
+    public static String CUSTOMIZE_STATUS_FINISHED = "1";
+    public static String CUSTOMIZE_STATUS_INCART = "2";// 在购物车中
+    public static String CUSTOMIZE_STATUS_DELETED = "3";// 已删除
+
+    /** 原材料展示形式 */
+    public static String MATERIAL_EXHIBITION_TYPE_COLOR = "0";
+    public static String MATERIAL_EXHIBITION_TYPE_PIC = "1";
+    public static String MATERIAL_EXHIBITION_TYPE_PRINT = "2";
+
+    /** 商品来源 */
+    public static String COMMODITY_SOURCE_USER = "1";
+    public static String COMMODITY_SOURCE_MERCHANT = "2";
+
+    /** 场景位置 */
+    public static String SCENE_LOCATION_MAIN = "1";
+    public static String SCENE_LOCATION_PERSONAL = "2";
+    
+    /** 场景类别 */
+    public static String SCENE_TYPE_MAIN_HEAD = "1";
+    public static String SCENE_TYPE_MAIN_LEFT = "2";
+    public static String SCENE_TYPE_MAIN_RIGHT = "3";
+    public static String SCENE_TYPE_PERSONAL_HEAD = "4";
+    
+    /** 物流公司编号 */
+    public static String DELIVERY_COM_SF = "shunfeng";
+    public static String DELIVERY_COM_NS = "nvshenzhuyi";
+    public static String DELIVERY_COM_REFER = "refer";// 关联订单号
+    
+    /** 定制图片文件后缀 */
+    public static String CUSTOMIZATION_PIC_EXTENSION = ".jpg";
+
+    /** 各业务图片相对路径 */
+    public static String RELATIVE_PATH_USER = "/user/";
+    public static String RELATIVE_PATH_CUSTOMIZE = "/customization/";
+    public static String RELATIVE_PATH_COMMODITY = "/commodity/";
+    public static String RELATIVE_PATH_MATERIAL = "/material/";
+    public static String RELATIVE_PATH_ACCESSORY = "/accessory/";
+    public static String RELATIVE_PATH_PROTOTYPE = "/prototype/";
+    public static String RELATIVE_PATH_BRAND = "/brand/";
+    public static String RELATIVE_PATH_SCENE = "/scene/";
+    public static String RELATIVE_PATH_ORDER = "/order/";
+    public static String RELATIVE_PATH_UPLOAD = "/upload/";
+    public static String RELATIVE_PATH_FAILURE = "/failure/";
+    
+    /** 类别是否必选 */
+    public static String TYPE_REQUIRED = "1";
+    public static String TYPE_UNREQUIRED = "0";
+
+    /** 属性类别的种类（关联原材料的父类别；不关联原材料的父类别；关联原材料的子类别） */
+    public static int TYPE_PT_PRAENT_WITH_M = 1;
+    public static int TYPE_PT_PRAENT_WITHOUT_M = 2;
+    public static int TYPE_PT_CHILD_WITH_M = 3;
+    
+    /**
+     * 配饰类别
+     */
+    public static String ACCESSORY_LOGO = "0";// 专属logo
+    public static String ACCESSORY_SLOT = "1";// 内部开格
+//    public static String ACCESSORY_USER_UPLOAD = "2";//高端定制，用户上传的图片
+//    public static String ACCESSORY_CAROUSEL = "3";// 基础款轮播图
+
+    /** 定制图片类别 */
+    public static String CUSTOMIZATION_PIC_TYPE_DESIGN = "1"; // 设计师设计图
+    public static String CUSTOMIZATION_PIC_TYPE_USER_UPLOAD = "2"; // 用户上传图片
+
+    /** 原型图片类别 */
+    public static String PROTOTYPE_PIC_TYPE_CAROUSEL = "1";
+    
+    /** 是否基础款基本类别 */
+    public static String IS_BASE_YES = "1";
+    public static String IS_BASE_NO = "0";
+    
+    /** 是否新品 */
+    public static String IS_NEW_YES = "1";
+    public static String IS_NEW_NO = "0";
+}

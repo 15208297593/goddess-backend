@@ -1,0 +1,233 @@
+<form id="fm" method="post" novalidate enctype='multipart/form-data'>
+<div class="sub-panel">
+
+    <input type="hidden" name="prototype_id" id="dlg_prototype_id" value="${p.prototype_id}"/>
+    <div class="fitem">
+        <label>基础款名称</label>
+        <input id="prototype_name" name="prototype_name" class="easyui-textbox" data-options="validType:'maxLength[50]'" value="${p.prototype_name}">
+    </div>
+    <div class="fitem">
+        <label>基础款描述（不超过200字）</label>
+        <input name="prototype_des" class="easyui-textbox" data-options="validType:'maxLength[500]'" style="width:400px;height:80px" multiline="true" value="${p.prototype_des}">
+    </div>
+    <div class="fitem">
+        <label>基础价格</label>
+        <input name="base_price" class="easyui-textbox" required="true" data-options="validType:'integer'" value="${p.base_price}">
+    </div>
+    <div class="fitem">
+        <label>用户印花价格</label> 
+        <input name="print_price" class="easyui-textbox" data-options="validType:'integer'" value="${p.print_price}">
+    </div>
+    <div class="fitem">
+        <label>基本属性描述</label>
+        <input id="base_properties" name="base_properties" class="easyui-textbox" data-options="validType:['maxLength[200]','json']" value='${p.base_properties}'>
+        <span style="color:red">* 描述格式为：【"属性名":"属性描述","属性名":"属性描述"】,例："尺寸":"18*18*18","容量":"2升"</span>
+    </div>
+    
+    <div class="fitem">
+        <div class="float-left"><label>所属品牌</label></div>
+        <div class='float-left' style='margin-bottom:10px'>
+            <select id="brand" name="brand_id" style="width:100px;margin-left:5px">
+              <% for (b in brands) { %>
+                  <option value="${b.id}" ${p.brand_id == b.id ? "selected='selected'" : ""}>${b.name}</option>
+              <% } %>
+            </select>
+        </div>
+    </div>
+    <div style="clear:both"></div>
+    <div class="fitem">
+        <div class="float-left"><label>基础款类别</label></div>
+        <div class='float-left' style='margin-bottom:10px' id="classification_area">
+            <select id="category" name="category" style="width:100px;margin-left:5px" onchange="changeCategory(this)">
+                  <option value="1" ${category == "1" ? "selected='selected'" : ""}>包袋</option>
+                  <option value="2" ${category == "2" ? "selected='selected'" : ""}>配饰</option>
+            </select>
+        </div>
+    </div>
+    <div style="clear:both"></div>
+    
+    <div class="fitem">
+        <div class="float-left"><label>内部开格</label></div>
+        <% if(!isEmpty(slots)) { %>
+            <% for (c in slots) { %>
+                <div style="float:left;" class="pic">
+                    <img src="${imageUrl!}/${c.accessory_pic}" style="width:150px;height:auto">
+                    <a class="c6" style="margin-left:10px" href="javascript:void(0)" onclick="destroyImg(this, ${c.accessory_id})">删除</a><br/>
+                    价格加成：<input name="accessory_price_${c.accessory_id}" class="easyui-textbox" data-options="validType:'integer'" value="${c.accessory_price}" style="width:80px">
+                </div>
+                <input type="hidden" id="delete_accessory_pic_${c.accessory_id}" name="delete_accessory_pic_${c.accessory_id}" value="0">
+            <% } %>
+        <% } %>
+        <a href="javascript:void(0)" class="for_add easyui-linkbutton c6" iconCls="icon-add" style="margin:10px"
+            onclick="addImg(this, '${accessory_type_slot}')" id="addImg">添加开格</a>
+    </div>
+    <div style="clear:both"></div>
+    <div class="fitem">
+        <div class="float-left"><label>logo</label></div>
+        <% if(!isEmpty(logos)) { %>
+            <% for (c in logos) { %>
+                <div style="float:left;" class="pic">
+                    <img src="${imageUrl!}/${c.accessory_pic}" style="width:150px;height:auto">
+                    <a class="c6" style="margin-left:10px" href="javascript:void(0)" onclick="destroyImg(this, ${c.accessory_id})">删除</a><br/>
+                    价格加成：<input name="accessory_price_${c.accessory_id}" class="easyui-textbox" data-options="validType:'integer'" value="${c.accessory_price}" style="width:80px">
+                </div>
+                <input type="hidden" id="delete_accessory_pic_${c.accessory_id}" name="delete_accessory_pic_${c.accessory_id}" value="0">
+            <% } %>
+        <% } %>
+        <a href="javascript:void(0)" class="for_add easyui-linkbutton c6" iconCls="icon-add" style="margin:10px"
+            onclick="addImg(this, '${accessory_type_logo}')" id="addImg">添加logo</a>
+    </div>
+    <div style="clear:both"></div>
+    <div class="fitem">
+        <div class="float-left"><label>基础款图片</label></div>
+        <div style="margin-left: 110px;" id="pic_area">
+            <div style="float:left;padding:10px" class="pic">
+                <input type="file" class="pic" name="prototype_pic_file" contentEditable="false" accept="jpg/jpeg/gif" style="display:none" onchange="uploadFile(this)"/>
+                <img alt="" src='${imageUrl!}/${p.prototype_pic!"default.jpg"}' style="width:150px;height:auto" id="prototype_pic_img" />
+                <input type="hidden" name="prototype_pic_delete" id="prototype_pic_delete" />
+            </div>
+            <a href="javascript:void(0)" class=" easyui-linkbutton c6" iconCls="icon-edit" style="margin:10px" onclick="changeImg(this)" id="btnChange">更改图片</a>
+        </div>
+    </div>
+    <div style="clear:both"></div>
+    <div class="fitem">
+        <div class="float-left"><label>轮播图</label></div>
+        <% if(!isEmpty(pic_carousel)) { %>
+            <% for (c in pic_carousel) { %>
+                <div style="float:left;" class="pic">
+                    <img src="${imageUrl!}/${c.accessory_pic}" style="width:150px;height:auto">
+                    <a class="c6" style="margin-left:10px" href="javascript:void(0)" onclick="destroyImg(this, ${c.accessory_id})">删除</a><br/>
+                </div>
+                <input type="hidden" name="accessory_type_${c.accessory_id}" value="${accessory_type_carousel}">
+                <input type="hidden" id="delete_accessory_pic_${c.accessory_id}" name="delete_accessory_pic_${c.accessory_id}" value="0">
+            <% } %>
+        <% } %>
+        <a href="javascript:void(0)" class="for_add easyui-linkbutton c6" iconCls="icon-add" style="margin:10px"
+            onclick="addImg(this, '${accessory_type_carousel}')" id="addImg">添加图片</a>
+    </div>
+    
+    <!-- <div class="fitem">
+        <div class="float-left"><label>印花相框</label></div>
+        <div style="margin-left: 110px;" id="pic_area">
+            <div style="float:left;padding:10px" class="pic">
+                <input type="file" class="pic" name="print_frame_file" contentEditable="false" accept="jpg/jpeg/gif" style="display:none" onchange="uploadFile(this)"/>
+                <img alt="" src="" style="width:100px;height:100px" id="print_frame_img" />
+                <input type="hidden" name="print_frame_delete" id="print_frame_delete" />
+            </div>
+            <a href="javascript:void(0)" class=" easyui-linkbutton c6" iconCls="icon-edit" style="margin:10px" onclick="changeImg(this)" id="btnChange">更改图片</a>
+        </div>
+    </div> -->
+    <!-- <div class="fitem">
+        <div class="float-left"><label>印花区域</label></div>
+        <div style="margin-left: 110px;position：relative" id="pic_area">
+            <div style="margin-bottom:5px">
+            左上角坐标:X<input type="text" id="startX" style="width: 50px"/>Y<input type="text" id="startY" style="width: 50px"/>
+            宽度:<input type="text" id="recW" style="width: 50px"/>
+            高度:<input type="text" id="recH" style="width: 50px"/>
+            <input type="hidden" name="print_frame" id="print_frame"/>
+            </div>
+            <div style="position:relative">
+                <img src="" style="position:absolute;left:0px;top:0px;z-index:1;border: 1px solid;" id="print_frame_img" />
+                <canvas id="canvas" style="position:absolute;left:0px;top:0px;z-index:10">
+            </canvas>
+            </div>
+        </div>
+    </div> -->
+</div>
+<input type="hidden" name="prototype_type" value="1" id="prototype_type" />
+    <input type="hidden" name="classification" id="classification" value="">
+</form>
+<script type="text/javascript">
+
+  var classificationTreeJson = eval(${classificationTreeJson});
+  var selectedClassification = new Set(eval(${selectedClassification!}));
+  var categories = eval(${categories});
+  $(function(){
+    $("#category").change();
+  })
+  
+  function changeImg(obj) {
+    $(obj).prev().children(":first").click();
+  }
+
+  function uploadFile(obj, newFile) {
+    var fi = obj.files[0];
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        if (newFile) {
+          $(obj).after('<img src="" style="width:150px;height:auto" >'+
+                    '<a class="c6" style="margin-left:10px" href="javascript:void(0)" onclick="destroyImg(this)">删除</a>');
+        }
+        $(obj).next().attr('src', e.target.result);
+    };
+    reader.readAsDataURL(fi);
+  }
+
+  function addImg(obj, accesory_type) {
+	  var now = new Date().getTime();
+      $(obj).before('<div style="float:left;" class="pic">'+
+    		        '<input type="file" class="pic" name="accessory_pic_'+now+
+    		        '" contentEditable="false" accept="jpg/jpeg/gif" style="display:none" onchange="uploadFile(this, true)"/><br/>'+
+    		        '<input type="hidden" name="accessory_type_'+now+'" value="'+accesory_type+'">'+
+    		        (accesory_type == ${accessory_type_carousel} ? '' : '价格加成：<input id="accessory_price_'+now+'" name="accessory_price_'+now+'" type="text" style="width:80px">')+
+    		        '</div>');
+      $('#accessory_price_'+now).textbox({
+    	  validType:'integer'
+      });
+      $(obj).prev().children(":first").click();
+  }
+  
+  function destroyImg(obj, id) {
+      // 警告
+      $.messager.confirm('Confirm','确认删除吗?',function(r){
+        if (r){
+            if (id) {
+                $("#delete_accessory_pic_"+id).val("1");
+            }
+            $(obj).parent().remove();
+        }
+      });
+  }
+
+  function changeCategory(obj) {
+    $(obj).nextAll().remove();
+    $('#classification_area').append(buildTree(categories[$(obj).val()], 'classification_', selectedClassification));
+  }
+  
+  function buildTree(node, type, selected) {
+      
+      var children = [];
+      var selectedNode;
+      if (node && node.children && node.children.length > 0) {
+          children.push('<select id="'+type+(node.id || 0)+'" name="'+type+(node.id || 0)+'" style="width:100px;margin-left:5px" onchange="genNext(this)">');
+          children.push('<option value="">无</option>');
+          node.children.forEach(function(c) {
+            if (selected.has(c.id)) selectedNode = c;
+            children.push('<option value="'+c.id+'" '+(selected.has(c.id) ? "selected='selected'" : "")+'>'+c.name+'</option>');
+          });
+          children.push('</select>');
+          children.push(buildTree(selectedNode, type, selected));
+      }
+      return children.join('');
+  }
+  
+  function genNext(obj) {
+    $(obj).nextAll().remove();
+    var id = $(obj).val();
+    if (!id) return;
+    var name = $(obj).attr('name');
+    var node = classificationTreeJson[id];
+    var type = name.substring(0, name.indexOf('_')+1);
+    var children = [];
+
+    if (node.children && node.children.length > 0) {
+      children.push('<select id="'+type+id+'" name="'+type+id+'" style="width:100px;margin-left:5px" onchange="genNext(this)">');
+      children.push('<option value="">无</option>');
+      node.children.forEach(function(c) {
+        children.push('<option value="'+c.id+'">'+c.name+'</option>');
+      });
+      children.push('</select>');
+      $(obj).after(children.join(''));
+    }
+  }
+</script>

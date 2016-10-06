@@ -1,0 +1,85 @@
+<div class="sub-panel">
+    <div style="padding-left:20px">
+        <div class="fitem for_update_input">
+            <label>关联原材料</label><span class='break-line' id='relateNames'></span>
+        </div>
+        <% if(action == "0") { %>
+	        <div class="fitem for_update_input">
+	            <label>类别名称</label>${property_type.type_name!}
+	        </div>
+	        <div class="fitem for_update_input">
+	            <label>类别名称（英文）</label>${property_type.type_name_ext!}
+	        </div>
+	        <div class="fitem">
+	            <label>使用类别</label>
+	              <select id="relate_ref_type" name="relate_ref_type" style="width:100px;">
+		              <% for (t in ref_types) { %>
+		                  <option value="${t.property_type_id}" ${property_type.relate_ref_type == t.property_type_id ? "selected='selected'" : ""}>${t.type_name}</option>
+		              <% } %>
+	              </select>
+	        </div>
+        <% } else { %>
+	        <div class="fitem">
+	            <label>价格加成</label>
+	            <input id="price_addition" name="price_addition" class="easyui-textbox" required="true" data-options="validType:'integ'" value="${property_type.price_addition!}">
+	        </div>
+        <% }%>
+    </div>
+    <div style="text-align:right;margin-top:10px">
+        <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-save" onclick="saveBaseRelateType()">保存</a>
+    </div>
+    <div style="clear:both;margin-bottom:5px"></div>
+	<input type="hidden" name="pids" value="${pids!}" id="pids" />
+	<input type="hidden" name="relate_type" value="${relate_type!}" id="relate_type" />
+	<input type="hidden" name="base_type" value="${base_type!}" id="base_type" />
+</div>
+<script type="text/javascript">
+
+    $(function(){
+
+    	$('#relateNames').html($('#baseDg').datagrid('getChecked').map(function(m){
+            return m.material_name;
+        }).join(','));
+    });
+    
+    function saveBaseRelateType() {
+
+        $('#propertyForm').form('submit',{
+          url: "${cxt!}/admin/prototype/saveBaseRelateType",
+          onSubmit: function(){
+        	// validate验证
+            if ($('#propertyForm').form('validate')) return true;
+            return false;
+          },
+          success: function(result){
+            var result = eval('('+result+')');
+            if (result.errorMsg){
+              $.messager.alert('Error', result.errorMsg, "error");
+            } else {
+              $('#baseDg').datagrid('reload');
+              $.messager.alert('Info', "更新成功！", "info");
+            }
+          }
+        });
+    }
+    
+    function updateBaseRelateType() {
+
+        //checkUpdate((true, 'checkUpdateType', $("#base_type").val(),',仍然删除吗?', function(){
+	        $('#propertyForm').form('submit',{
+	          url: "${cxt!}/admin/prototype/updateBaseRelateType",
+	          onSubmit: function(){
+	          },
+	          success: function(result){
+	            var result = eval('('+result+')');
+	            if (result.errorMsg){
+	              $.messager.alert('Error', result.errorMsg, "error");
+	            } else {
+                  $('#baseDg').datagrid('reload');
+	              $.messager.alert('Info', "更新成功！", "info");
+	            }
+	          }
+	        });
+        //});
+    }
+</script>

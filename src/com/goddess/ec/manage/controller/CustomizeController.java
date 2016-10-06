@@ -1,0 +1,568 @@
+package com.goddess.ec.manage.controller;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.log4j.Logger;
+
+import com.alibaba.druid.support.json.JSONUtils;
+import com.goddess.ec.manage.annotation.Controller;
+import com.goddess.ec.manage.common.DictKeys;
+import com.goddess.ec.manage.common.SplitPage;
+import com.goddess.ec.manage.constants.AppConstants;
+import com.goddess.ec.manage.model.Commodity;
+import com.goddess.ec.manage.model.CommodityPic;
+import com.goddess.ec.manage.model.Prototype;
+import com.goddess.ec.manage.plugin.PropertiesPlugin;
+import com.goddess.ec.manage.service.CommodityService;
+import com.goddess.ec.manage.service.CustomizeService;
+import com.goddess.ec.manage.tools.ToolDateTime;
+import com.goddess.ec.manage.tools.ToolSqlXml;
+import com.goddess.ec.manage.tools.ToolUtils;
+import com.jfinal.aop.Before;
+import com.jfinal.kit.JsonKit;
+import com.jfinal.plugin.activerecord.Db;
+import com.jfinal.plugin.activerecord.Record;
+import com.jfinal.plugin.activerecord.tx.Tx;
+import com.jfinal.upload.UploadFile;
+
+/**
+ * 定制
+ */
+@Controller(controllerKey = "/admin/customize")
+public class CustomizeController extends BaseController {
+
+    @SuppressWarnings("unused")
+    private static Logger log = Logger.getLogger(CustomizeController.class);
+    
+    private static String TYPE_MATERIAL_SEPERATOR = "@";
+
+    private static String ruleStr = "{\"1-001\":\"21\",\"1-002\":\"22\",\"1-003\":\"23\",\"1-004\":\"24\",\"1-005\":\"25\",\"1-006\":\"26\",\"1-007\":\"27\",\"1-008\":\"28\",\"1-009\":\"29\",\"1-010\":\"30\",\"1-011\":\"31\",\"1-012\":\"32\",\"1-013\":\"33\",\"1-014\":\"34\",\"1-015\":\"35\",\"1-016\":\"36\",\"1-017\":\"37\",\"1-018\":\"38\",\"1-019\":\"39\",\"1-020\":\"40\",\"1-021\":\"41\",\"1-022\":\"42\",\"1-023\":\"43\",\"2-001\":\"1\",\"2-002\":\"2\",\"2-003\":\"3\",\"2-004\":\"4\",\"2-005\":\"5\",\"2-006\":\"6\",\"2-007\":\"7\",\"2-008\":\"8\",\"2-009\":\"9\",\"2-012\":\"62\",\"2-013\":\"63\",\"2-014\":\"64\",\"2-015\":\"65\",\"2-016\":\"66\",\"2-017\":\"67\",\"2-018\":\"68\",\"2-019\":\"69\",\"2-020\":\"70\",\"2-021\":\"71\",\"2-022\":\"72\",\"2-023\":\"73\",\"2-024\":\"74\",\"2-025\":\"75\",\"2-026\":\"76\",\"2-027\":\"77\",\"2-028\":\"78\",\"2-029\":\"79\",\"2-030\":\"80\",\"2-031\":\"81\",\"2-032\":\"82\",\"2-033\":\"83\",\"2-034\":\"84\",\"3-001\":\"10\",\"3-002\":\"11\",\"4-001\":\"12\",\"4-002\":\"13\",\"4-003\":\"14\",\"4-004\":\"15\",\"4-005\":\"16\",\"4-006\":\"17\",\"4-007\":\"18\",\"4-008\":\"19\",\"4-009\":\"20\",\"4-010\":\"44\",\"4-011\":\"45\",\"4-012\":\"46\",\"4-013\":\"47\",\"4-014\":\"48\",\"4-015\":\"49\",\"4-016\":\"50\",\"4-017\":\"51\",\"4-018\":\"52\",\"4-019\":\"53\",\"4-020\":\"54\",\"4-021\":\"55\",\"4-022\":\"56\",\"4-023\":\"57\",\"4-024\":\"58\",\"4-025\":\"59\",\"4-026\":\"60\",\"4-027\":\"61\"}";
+    /**
+     * 原型及其所有属性类别一览
+     */
+    public void index() {
+
+    	render("/customize/customizationList.html");
+    }
+    
+    @SuppressWarnings("unchecked")
+	public void genPic() throws IOException {
+
+//		Map<String, String> rule = (Map<String, String>)JSONUtils.parse(ruleStr);
+//		int prototypeId getParaToInt(0);//Integer.valueOf(name.substring(0, 3));
+		
+		// 
+		List<Record> idName = Db.find(ToolSqlXml.getSql("manage.customize.genPic"));
+		Map<String, String> idNameMap = new HashMap<String, String>();
+		for (Record r : idName) {
+			idNameMap.put(r.getStr("nameStr"), r.getStr("idStr"));
+		}
+		
+		File dir = new File("/Users/bighua/Documents/ps/1080psd");
+		File[] psDir = dir.listFiles();
+		int index = 0;
+		for (File d : psDir) {
+			String dName = d.getName();
+			if (d.isDirectory()) {
+				File[] pics = d.listFiles();
+				// 
+				if (index > 0) break;
+				if (pics.length > 0) {
+//					index++;
+				} else {
+					continue;
+				}
+				File idDir = new File("/Users/bighua/Documents/ps/id", dName + "_id");
+				if (!idDir.exists()) {
+					FileUtils.forceMkdir(idDir);
+				}
+//				if (idDir.list().length > 0) continue;
+				for (File p : pics) {
+					String fName = p.getName().replace("_五金@空白", "").replace(" 拷贝", "").replace("纹理@", "皮质@").replace("金属件 ", "").replace("蛇皮@", "珍稀皮@");
+					String cName = fName.replace(".jpg", "").substring(1);
+					String[] tm = cName.split("_");
+					for (String s : tm) {
+						if (idNameMap.get(s.trim()) == null) {
+							System.out.println(dName + "--" + s);
+						}
+						fName = fName.replace(s, idNameMap.get(s.trim()));
+					}
+					if (fName.indexOf("_4@") >= 0)
+						fName = "_2@1" + fName;
+					FileUtils.copyFile(p, new File(idDir, fName));
+				}
+			}
+		}
+    }
+    
+    public void listPrototypesWithTypes() {
+
+        SplitPage sp = new SplitPage();
+        // 检索条件设定
+        sp.setPageNumber(getParaToInt("page"));
+        sp.setPageSize(getParaToInt("rows"));
+        sp.setOrderColunm(getPara("sort"));
+        sp.setOrderMode(getPara("order"));
+
+        Map<String, String> queryParam = new HashMap<String, String>();
+        sp.setQueryParam(queryParam);
+        
+    	CustomizeService.service.getPrototypesWithTypes(sp);
+
+        Map<String, Object> jsonRes = new HashMap<String, Object>();
+        jsonRes.put("total",  sp.getPage().getTotalRow());
+        jsonRes.put("rows",  sp.getPage().getList());
+        renderJson(jsonRes);
+    }
+    
+    @SuppressWarnings("unchecked")
+	public void getCustomizeProperties() {
+    	List<Record> properties = CustomizeService.service.getPropertiesByPrototypeId(getParaToInt(0));
+    	Map<Integer, Record> propertiesWithTypes = new HashMap<Integer, Record>();
+    	List<Record> customizeProperties = new ArrayList<Record>();
+    	for (Record r : properties) {
+    		Integer propertyTypeId = r.getInt("property_type_id");
+    		Record pWithType = propertiesWithTypes.get(propertyTypeId);
+    		if (pWithType == null) {
+    			pWithType = new Record().set("property_type_id", r.getInt("property_type_id")).set(
+    										"material_type_id", r.getInt("material_type_id")).set(
+    										"type_name", r.getStr("type_name")).set(
+    										"exhibition_type", r.getStr("exhibition_type"));
+    			List<Record> props = new ArrayList<Record>();
+    			pWithType.set("props", props);
+    			propertiesWithTypes.put(propertyTypeId, pWithType);
+    			customizeProperties.add(pWithType);
+    		}
+    		((List<Record>)(pWithType.get("props"))).add(
+    				new Record().set("property_id", r.getInt("property_id")).set(
+    								"material_id", r.getInt("material_id")).set(
+				    				"material_name", r.getStr("material_name")).set(
+									"material_exhibition", r.getStr("material_exhibition")));
+    	}
+    	setAttr("properties", customizeProperties);
+    	setAttr("typeAndMaterial", JsonKit.toJson(CustomizeService.service.getMaterialCombination()));
+    	setAttr("prototype_id", getParaToInt(0));
+    	render("/customize/customizeProperties.html");
+    }
+    
+    /**
+     * 将配置好的基础款属性添加到定制品表customization
+     * @throws IOException 
+     */
+    @Before(Tx.class)
+    public void saveCustomizations() throws IOException {
+    	
+    	int prototypeId = getParaToInt(0);
+    	// 1.图片是否已经放入服务器指定上传路径 /upload/customization/{prototype_id}/_1@1_2@1_3@1_.jpg
+    	String relativePath = AppConstants.RELATIVE_PATH_CUSTOMIZE+prototypeId;
+    	File upPath = new File(ToolUtils.getPicPath(AppConstants.RELATIVE_PATH_UPLOAD + relativePath));
+    	// 2.取得该原型所有属性
+    	List<Record> typeAndPro = CustomizeService.service.getPropertiesCombination(prototypeId);
+    	LinkedList<String> combinationList = new LinkedList<String>();
+    	Map<Integer, List<Record>> typeAndProMap = new HashMap<Integer, List<Record>>();
+    	Set<String> tpSet = new HashSet<String>();
+    	List<Record> uncustomized = new ArrayList<Record>();
+    	// 插入DB的定制数据
+		List<Record> customizations = new ArrayList<Record>();
+		Set<String> baseCus = new HashSet<String>();
+		
+		List<Record> requiredType = Db.find(ToolSqlXml.getSql("manage.customize.getRequiredPro"), prototypeId);
+    	// 3.判断是否第一次导入此原型
+    	boolean isFirsImport = CustomizeService.service.isPrototypeCustomized(prototypeId) == null;
+    	if (isFirsImport) {
+
+    		// 利用队列计算出所有属性组合（按类别id大小顺序组合）
+    		for (Record r : typeAndPro) {
+    			List<Record> tps = typeAndProMap.get(r.getInt("material_type_id"));
+    			if (tps == null) {
+    				tps = new ArrayList<Record>();
+    				typeAndProMap.put(r.getInt("material_type_id"), tps);
+    			}
+    			tps.add(new Record().set("type_property", r.getStr("type_property")).set(
+				    					"exhibition_type", r.getStr("exhibition_type")).set(
+				    					"material_type_id", r.getInt("material_type_id")));
+    			tpSet.add(r.getStr("type_property"));
+    			// 格式:_1@1
+    			combinationList.addLast(r.getStr("type_property"));
+    			baseCus.add(r.getStr("type_property"));
+    		}
+    	} else {
+    		// 未定制化的所有属性组合
+    		uncustomized = CustomizeService.service.getUnCustomizedCombination(prototypeId);
+    		if (uncustomized.size() != 0) {
+	    		for (Record r : typeAndPro) {
+	    			List<Record> tps = typeAndProMap.get(r.getInt("material_type_id"));
+	    			if (tps == null) {
+	    				tps = new ArrayList<Record>();
+	    				typeAndProMap.put(r.getInt("material_type_id"), tps);
+	    			}
+	    			tps.add(new Record().set("type_property", r.getStr("type_property")).set(
+					    					"exhibition_type", r.getStr("exhibition_type")).set(
+					    					"material_type_id", r.getInt("material_type_id")));
+	    			tpSet.add(r.getStr("type_property"));
+	    		}
+	    		for (Record r : uncustomized) {
+	    			// 格式:_1@1
+	    			combinationList.addLast(r.getStr("type_property"));
+	    			baseCus.add(r.getStr("type_property"));
+	    		}
+    		}
+			// 更新已经生成定制的图片
+			updateCustomizations(upPath, relativePath, prototypeId);
+    	}
+		while (!combinationList.isEmpty()) {
+			String propertyKey = combinationList.removeFirst();
+			String customizationPic = null;
+			File pic = new File(upPath, propertyKey + "_" + AppConstants.CUSTOMIZATION_PIC_EXTENSION);
+			// 1. 将属性关键字串命名的图片转移到图片访问路径
+			if (pic.exists()) {
+				customizationPic = String.format("%s/%s", relativePath, propertyKey + "_" + AppConstants.CUSTOMIZATION_PIC_EXTENSION);
+			}
+			if (requiredType.size() == 0) {
+				baseCus.remove(propertyKey);
+				customizations.add(new Record().set("prototype_id", prototypeId).set("property_key", propertyKey + "_").set("custome_pic", customizationPic));
+				if (customizationPic != null)
+					FileUtils.moveFileToDirectory(pic, new File(ToolUtils.getPicPath(relativePath)), true);
+			} else {
+				String[] types = propertyKey.substring(1).split("_");
+				Set<String> cTypes = new HashSet<String>();
+				for (String r : types) cTypes.add(r.substring(0, r.indexOf("@")));
+				boolean haveAll = true;
+				for (Record r : requiredType) {
+					if (!cTypes.contains(r.getInt("material_type_id").toString())) {
+						haveAll = false;
+						break;
+					}
+				}
+				if (haveAll) {
+					baseCus.remove(propertyKey);
+					customizations.add(new Record().set("prototype_id", prototypeId).set("property_key", propertyKey + "_").set("custome_pic", customizationPic));
+					if (customizationPic != null)
+						FileUtils.moveFileToDirectory(pic, new File(ToolUtils.getPicPath(relativePath)), true);
+				}
+			}
+//			// 2.添加customization数据到批量数组，1000条提交一次
+//			if (customizations.size() == 1000) {
+//				CustomizeService.service.saveCustomizations(customizations);
+//				customizations.clear();
+//			}
+			
+			// 3.添加新的组合到队列
+			for (Integer typeId : typeAndProMap.keySet()) {
+				// 不是同一个类别
+				if (!propertyKey.contains(String.format("_%s@", typeId))) {
+					String[] types = propertyKey.substring(1).split("_");
+					// 保证属性关键字串按照类别id顺序排列
+					int index = 0;
+					while (index < types.length) {
+						if (typeId < Integer.valueOf(types[index].split(TYPE_MATERIAL_SEPERATOR)[0])) break;
+						index++;
+					}
+					String format = "";
+					for (int i = 0; i < types.length; i++) {
+						if (i == index) {
+							format += "%s";
+						}
+						format += "_" + types[i];
+					}
+					if (index == types.length) format += "%s";
+					// 印花相框的特别处理，将带有其他属性的印花相框作为原材料id为0的材料
+					List<Record> tp = typeAndProMap.get(typeId);
+					if (tp.size() != 0) {
+						// 相框图片,不从这里上传了，手动吧先
+//						if (AppConstants.MATERIAL_EXHIBITION_TYPE_PRINT.equals(tp.get(0).getStr("exhibition_type"))) {
+//							// _{印花原材料类别id}@0
+//							String newComb = String.format(format, String.format("_%s@0", typeId));
+//							if (tpSet.add(newComb))
+//								combinationList.addLast(newComb);
+//						}
+						for (Record r : tp) {
+							String newComb = String.format(format, r.getStr("type_property"));
+							if (tpSet.add(newComb))
+								combinationList.addLast(newComb);
+						}
+					}
+				}
+			}
+		}
+		Iterator<String> bi = baseCus.iterator();
+		while (bi.hasNext()) {
+			customizations.add(new Record().set("prototype_id", prototypeId).set("property_key", bi.next() + "_"));
+		}
+		if (customizations.size() != 0) CustomizeService.service.saveCustomizations(customizations);
+		// 将上传文件夹中（upload/customization/{prototype_id}）命名不正确的文件移到失败文件夹中（failure/customization/{prototype_id}）
+    	if (upPath.list() != null) {
+			for (File pic : upPath.listFiles()) {
+				FileUtils.moveFileToDirectory(pic, new File(ToolUtils.getPicPath(AppConstants.RELATIVE_PATH_FAILURE + relativePath)), true);
+			}
+    	}
+    	renderJson();
+    }
+    
+    /**
+     * 更新已经生成定制的图片
+     * 
+     * @param upPath
+     * @param relativePath
+     * @param prototypeId
+     * @throws IOException 
+     */
+    private void updateCustomizations(File upPath, String relativePath, int prototypeId) throws IOException {
+    	
+    	if (upPath.list() == null) return;
+		// 更新已经生成定制的图片
+		List<Record> updateCustomizations = new ArrayList<Record>();
+		for (File pic : upPath.listFiles()) {
+			// 去掉文件后缀
+			String propertyKey = pic.getName();
+			propertyKey = propertyKey.substring(0, propertyKey.lastIndexOf("."));
+
+			String customizationPic = String.format("%s/%s", relativePath, pic.getName());
+			updateCustomizations.add(new Record().set("prototype_id", prototypeId).set(
+					"property_key", propertyKey).set(
+					"custome_pic", customizationPic));
+		}
+		if (updateCustomizations.size() != 0) {
+			int[] result = CustomizeService.service.updateCustomizations(updateCustomizations);
+			for (int i = 0; i < result.length; i++) {
+				// 此条记录被更新
+				if (result[i] == 1) {
+					// 将属性关键字串命名的图片转移到图片访问路径
+					FileUtils.deleteQuietly(new File(ToolUtils.getPicPath(relativePath), updateCustomizations.get(i).getStr("property_key") + AppConstants.CUSTOMIZATION_PIC_EXTENSION));
+					FileUtils.moveFileToDirectory(new File(upPath, updateCustomizations.get(i).getStr("property_key") + AppConstants.CUSTOMIZATION_PIC_EXTENSION), 
+							new File(ToolUtils.getPicPath(relativePath)), true);
+				}
+			}
+		}
+	}
+    
+    public void searchCustomizations() {
+
+		Map<String, String> params = getAttr("paramMap");//ToolWeb.getParamMap(getRequest());
+    	LinkedList<String> combinationList = new LinkedList<String>();
+    	Map<Integer, List<String>> typeAndProMap = new HashMap<Integer, List<String>>();
+		List<String> searchKeyList = new ArrayList<String>();
+		List<String> allKeyList = new ArrayList<String>();
+    	for(String key : params.keySet()) {
+    		if (key.startsWith("material_id_")) {
+    			Integer materialTypeId = Integer.valueOf(key.replace("material_id_", "").split("_")[0]);
+    			List<String> typeAndPro = typeAndProMap.get(materialTypeId);
+    			if (typeAndPro == null) {
+    				typeAndPro = new ArrayList<String>();
+    				typeAndProMap.put(materialTypeId, typeAndPro);
+    			}
+    			typeAndPro.add(params.get(key));
+    			combinationList.addLast(params.get(key));
+    			searchKeyList.add(params.get(key) + "_");
+    		}
+    	}
+		while (!combinationList.isEmpty()) {
+			String propertyKey = combinationList.removeFirst();
+
+			// 3.添加新的组合到队列
+			for (Integer typeId : typeAndProMap.keySet()) {
+				// 类别id比已有的大
+				int maxId = Integer.valueOf(propertyKey.substring(propertyKey.lastIndexOf("_")+1, propertyKey.lastIndexOf(TYPE_MATERIAL_SEPERATOR)));
+				if (maxId < typeId) {
+					for (String s : typeAndProMap.get(typeId)) {
+		    			combinationList.addLast(propertyKey + s);
+		    			String searchKey = propertyKey + s + "_";
+		    			searchKeyList.add(searchKey);
+		    			if (searchKey.split("_").length - 1 == typeAndProMap.size())
+		    				allKeyList.add(searchKey);
+					}
+				}
+			}
+		}
+
+        SplitPage sp = new SplitPage();
+        // 检索条件设定
+        sp.setPageNumber(getParaToInt("page"));
+        sp.setPageSize(getParaToInt("rows"));
+        sp.setOrderColunm(getPara("sort"));
+        sp.setOrderMode(getPara("order"));
+
+        Map<String, String> queryParam = new HashMap<String, String>();
+        queryParam.put("prototype_id", getPara("prototype_id"));
+        queryParam.put("is_shelved", AppConstants.IS_SHELVED_ON);
+        queryParam.put("property_key", StringUtils.join(typeAndProMap.size() == 1 ? searchKeyList  : allKeyList, ","));
+        sp.setQueryParam(queryParam);
+
+    	CustomizeService.service.searchCustomizationsByPropertyKey(sp);
+
+        Map<String, Object> jsonRes = new HashMap<String, Object>();
+        jsonRes.put("total",  sp.getPage().getTotalRow());
+        jsonRes.put("rows",  sp.getPage().getList());
+        renderJson(jsonRes);
+    }
+    
+    /**
+     * 图片导入页面初始化（/customize/searchCustomizedPic/{prototype_id}）
+     */
+    public void searchCustomizedPic() {
+    	setAttr("prototype_id", getParaToInt(0));
+    	setAttr("typeAndMaterial", JsonKit.toJson(CustomizeService.service.getMaterialCombination()));
+    	
+    	render("/customize/customizedPic.html");
+    }
+    
+    /**
+     * 图片导入数据一览
+     */
+    public void listCustomizedPic() {
+
+        SplitPage sp = new SplitPage();
+        // 检索条件设定
+        sp.setPageNumber(getParaToInt("page"));
+        sp.setPageSize(getParaToInt("rows"));
+        sp.setOrderColunm(getPara("sort"));
+        sp.setOrderMode(getPara("order"));
+
+        List<Record> requiredPros = Db.find(ToolSqlXml.getSql("manage.customize.getRequiredPro"), getPara(0));
+        StringBuilder requiredSearchStr = new StringBuilder();
+        for (Record r : requiredPros) {
+        	requiredSearchStr.append(String.format("_%s@", r.getInt("material_type_id"))).append("%");
+        }
+        Map<String, String> queryParam = new HashMap<String, String>();
+        queryParam.put("prototype_id", getPara(0));
+        queryParam.put("is_imported", getPara("is_imported"));
+        if (requiredSearchStr.length() != 0)
+        	queryParam.put("requireSearchStr", "%" + requiredSearchStr.toString());
+        sp.setQueryParam(queryParam);
+
+    	CustomizeService.service.getCustomizedPic(sp);
+
+        Map<String, Object> jsonRes = new HashMap<String, Object>();
+        jsonRes.put("total",  sp.getPage().getTotalRow());
+        jsonRes.put("rows",  sp.getPage().getList());
+        renderJson(jsonRes);
+    }
+    
+    public void updateCustomizedPic() {
+    	UploadFile upPic = getFile();
+    	
+    	int prototypeId = getParaToInt(0);
+    	String propertyKey = getPara(1);
+    	boolean needUpdate = getParaToBoolean(2);
+    	
+    	try {
+    		String customizationPic = ToolUtils.saveUploadFileWithoutSurfix(upPic, AppConstants.RELATIVE_PATH_CUSTOMIZE+prototypeId, propertyKey+ToolUtils.getExtension(upPic.getOriginalFileName()));
+			setAttr("custome_pic", customizationPic);
+			if (needUpdate)
+				Db.update(ToolSqlXml.getSql("manage.customize.updateCustomizations"), customizationPic, prototypeId, propertyKey);
+		} catch (IOException e) {
+			setAttr("errorMsg", "文件上传失败！");
+			e.printStackTrace();
+		}
+    	renderJson(new String[]{"errorMsg", "custome_pic"});
+    }
+    
+    /**
+     * 初始化商品详情页
+     */
+    public void getCustomizationForShelve() {
+
+    	int prototypeId = getParaToInt(0);
+    	String propertyKey = getPara(1);
+    	Prototype p = Prototype.dao.findById(prototypeId);
+    	Commodity c = new Commodity();
+    	c.set("prototype_id", p.getInt("prototype_id"));
+    	c.set("property_key", propertyKey);
+    	c.set("base_properties", p.getStr("base_properties"));
+
+    	Record customization = Db.findFirst(ToolSqlXml.getSql("manage.customize.getCustomization"), prototypeId, propertyKey);
+    	c.set("commodity_pic", customization == null ? null : customization.getStr("custome_pic"));
+    	
+    	c.set("commodity_source", AppConstants.COMMODITY_SOURCE_MERCHANT);
+    	c.set("commodity_name", p.getStr("prototype_name"));
+    	int price = p.getInt("base_price") + CommodityService.service.getAdditionPrice(propertyKey);
+    	c.set("price", price);
+    	c.set("return_points", calcReturnPoints(price));
+    	
+    	List<Record> tmList = new ArrayList<Record>();
+    	String[] tms = propertyKey.substring(1).split("_");
+    	for (String tm : tms) {
+    		String[] tmArr = tm.split("@");
+    		tmList.add(Db.findFirst(ToolSqlXml.getSql("manage.customize.getMaterialAttrByMid"), tmArr[1]));
+    	}
+
+    	setAttr("tm", tmList);
+    	setAttr("img_root", PropertiesPlugin.getParamMapValue(DictKeys.image_url));
+    	setAttr("ref_price", price);
+    	setAttr("commodity", c);
+    	render("/commodity/commodityDetail.html");
+    
+    }
+    
+    /**
+     * 定制商品上架
+     * @throws IOException
+     */
+    @Before(Tx.class)
+    public void shelve() throws IOException {
+
+    	// 0.商品图片
+    	List<UploadFile> upFiles = getFiles();
+    	Commodity c = new Commodity();
+    	String propertyKey = getPara("property_key");
+    	// 1.上架商品
+    	c.set("prototype_id", getParaToInt("prototype_id")).set(
+				"property_key", propertyKey).set(
+				"base_properties", getPara("base_properties")).set(
+				"commodity_pic", getPara("commodity_pic")).set(
+				"commodity_source", AppConstants.COMMODITY_SOURCE_MERCHANT).set(
+				"commodity_name", getPara("commodity_name")).set(
+				"commodity_des", getPara("commodity_des")).set(
+				"price", getParaToInt("price")).set(
+				"return_points", calcReturnPoints(getParaToInt("price"))).set(
+				"shelve_date", ToolDateTime.getNow()).set(
+				"is_shelved", AppConstants.IS_SHELVED_ON).save();
+    	int commodityId = c.getInt("commodity_id");
+    	// 2.添加商品图片
+		for (UploadFile f : upFiles) {
+			String picType = f.getParameterName();
+			String saveURL = ToolUtils.saveUploadFile(f, AppConstants.RELATIVE_PATH_COMMODITY + commodityId, 
+					picType, ToolUtils.getExtension(f.getOriginalFileName()));
+			if ("commodity_pic_img".equals(picType)) {
+				c.findById(commodityId).set("commodity_pic", saveURL).update();
+			} else if (StringUtils.isNotBlank(getPara(picType+"id"))) {
+				CommodityPic.dao.findById(getParaToInt(picType+"id")).set("commodity_pic", saveURL).update();
+			} else {
+				String rank = picType.substring(picType.lastIndexOf("_")+1);
+				picType = picType.substring(0, picType.lastIndexOf("_")+1);
+				CommodityPic cp = new CommodityPic().set("commodity_id", commodityId).set(
+														"pic_type", getPara(picType+"type")).set(
+														"commodity_pic", saveURL).set(
+														"rank", StringUtils.isBlank(rank) ? 0 : Integer.valueOf(rank));
+				cp.save();
+			}
+		}
+		// 3.更新定制属性
+		List<Record> cps = new ArrayList<Record>();
+		String[] typeAndMaterial = propertyKey.substring(1, propertyKey.length() - 1).split("_");
+		for (String tm : typeAndMaterial) {
+			String[] tmArr = tm.split(TYPE_MATERIAL_SEPERATOR);
+//			Db.save("customization_properties", 
+			cps.add(new Record().set("prototype_id", getParaToInt("prototype_id")).set(
+									"user_customization_id", null).set(
+									"commodity_id", commodityId).set(
+									"material_type_id", Integer.valueOf(tmArr[0])).set(
+									"material_id", Integer.valueOf(tmArr[1])));
+		}
+		// 批量更新的事务是独立的，改成循环
+		CustomizeService.service.saveCustomizationProperties(cps);
+    	renderJson();
+    }
+
+}

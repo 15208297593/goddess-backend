@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<sql-statement namespace="manage.brand">
+
+    <sql id="all">
+        <![CDATA[
+              FROM brand
+        ]]>
+    </sql>
+
+    <sql id="allBrands">
+        <![CDATA[
+            SELECT brand_id as id,
+                   brand_name as name 
+              FROM brand 
+             WHERE delete_flag = '0'
+        ]]>
+    </sql>
+
+    <sql id="syncNewAmount">
+        <![CDATA[
+            UPDATE brand b
+               SET b.new_amount = (
+                SELECT count(*) 
+                  FROM commodities 
+                 WHERE is_new = ? 
+                   AND brand_id = ?
+                )
+             WHERE b.brand_id = ?
+        ]]>
+    </sql>
+
+    <sql id="syncAllNewAmount">
+        <![CDATA[
+            UPDATE brand b
+        INNER JOIN (
+                SELECT brand_id,
+                       count(*) new_amount 
+                  FROM commodities 
+                 WHERE is_new = ? 
+                group by brand_id
+                ) c
+               SET b.new_amount = c.new_amount
+             WHERE c.brand_id = b.brand_id
+        ]]>
+    </sql>
+    
+</sql-statement>

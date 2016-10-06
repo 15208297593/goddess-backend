@@ -1,0 +1,211 @@
+<% var toolbar = { %> 
+    
+  <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-add" onclick="insertLogoPrint()">添加</a>
+<%};
+var dialog = { %> 
+
+<%};
+var datagrid = { %> 
+    <table id="logoPrints">
+    </table>
+<%};
+var dlg_buttons = { %> 
+    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-cancel" onclick="javascript:$('#dlg').dialog('close')" style="width:90px">关闭</a>
+<%};
+var otherDialogs = { %> 
+<%};
+include("/listLayout.html",
+        {toolbar:toolbar,
+        dialog:dialog, 
+        datagrid:datagrid,
+        dlg_buttons:dlg_buttons,
+        otherDialogs:otherDialogs,
+        dialog_title:""}){}
+%>
+
+<script type="text/javascript">
+
+  $(function(){
+    $('#fm').attr('enctype', 'multipart/form-data');
+    var logoTypes = ${logoTypes};
+    var logoTypesText = {};
+    logoTypes.forEach(function(r) {
+    	logoTypesText[r.code] = r.text;
+    })
+    $('#logoPrints').datagrid({
+        title:'',
+        iconCls:'icon-edit',
+        width:700,
+        height:550,
+        singleSelect:true,
+        idField:'logo_print_id',
+        url:'${cxt!}/admin/logoPrint/getLogoPrints/',
+        columns:[[
+            {field:'logo_print_id',title:'id',width:80},
+            {field:'logo_type',title:'印制类别',width:150,
+                editor:{
+                    type:'combobox',
+                    options:{
+                        valueField:'code',
+                        textField:'text',
+                        data:logoTypes,
+                        required:true,
+                        editable:false
+                    }
+                },
+                formatter:function(value){
+                    return logoTypesText[value];
+                }
+            },
+            {field:'logo_name',title:'logo名称',width:150,
+                editor:{
+                  type:'textbox',
+                  options:{
+                    required:true,
+                    validType:'maxLength[50]'
+                  }
+                }
+              },
+            {field:'logo_pic',title:'图片展示',width:200,
+                formatter:function(value, row, index){
+                  if (!value) value = "/default.jpg";
+                  value = value + "?t=" + new Date().getTime();
+                  return '<div style="float:left;padding:10px" class="pic"><input type="file" class="pic" name="logo_pic_' + index + '" id="logo_pic_' + index +
+                    '" contentEditable="false" accept="jpg/jpeg/gif" style="display:none" onchange="uploadFile(this)"/>'+
+                      '<img src="${imageUrl!}/'+ value +'" style="width:100px;" >'+
+                        '<a class="c6" style="margin-left:10px;display:none" href="javascript:void(0)" onclick="changeImg(this)" id="btnChangePic_'+index+'">更换</a></div>';
+                }
+            },
+            {field:'action',title:'操作',width:100,align:'center',
+                formatter:function(value,row,index){
+                    if (row.editing){
+                        var s = '<a href="#" onclick="saveLogoPrint(this,'+index+')">保存</a> ';
+                        var c = '<a href="#" onclick="cancelLogoPrint(this,'+index+')">取消</a>';
+                        return s+c;
+                    } else {
+                        var e = '<a href="#" onclick="editLogoPrint(this,'+index+')">编辑</a> ';
+                        var d = '<a href="#" onclick="deleteLogoPrint('+row.logo_print_id+')">删除</a> ';
+                        return e+d;
+                    }
+                }
+            }
+        ]],
+        onBeforeEdit:function(index,row){
+            row.editing = true;
+            updateActions(index, row, 'logoPrints');
+            $("#btnChangePic_"+index).show();
+        },
+        onAfterEdit:function(index,row){
+            row.editing = false;
+            updateActions(index, row, 'logoPrints');
+        },
+        onCancelEdit:function(index,row){
+            row.editing = false;
+            updateActions(index, row, 'logoPrints');
+            $("#btnChangePic_"+index).hide();
+        }
+    });
+
+  });
+
+  function updateActions(index, row, table){
+    var targetTable = $('#dg');
+    if (table) targetTable = $('#' + table);
+    targetTable.datagrid('updateRow',{
+          index: index,
+          row: row ? row : {}
+      });
+  }
+  
+  function insertLogoPrint(){
+    var index = 0;
+    $('#logoPrints').datagrid('insertRow', {
+        index: index,
+        row:{}
+    });
+    $('#logoPrints').datagrid('selectRow',index);
+    $('#logoPrints').datagrid('beginEdit',index);
+  }
+
+  function editLogoPrint(target, index){
+    $('#logoPrints').datagrid('selectRow',index); 
+    $('#logoPrints').datagrid('beginEdit', index);
+  }
+  
+  function deleteLogoPrint(logo_print_id){
+    $.messager.confirm('确认','确认删除吗?',function(r){
+        if (r){
+            // 删除配饰
+            $.get('${cxt!}/admin/logoPrint/deleteLogoPrint/' + logo_print_id,
+            function(result){
+              if (result.errorMsg){
+                $.messager.alert( 'Error', result.errorMsg);
+              } else {
+                $('#logoPrints').datagrid('reload');      // reload data
+              }
+            },'json');
+        }
+    });
+  }
+  
+  function saveLogoPrint(target, index){
+
+    var row = $('#logoPrints').datagrid('getSelected');
+    if ($('#logoPrints').datagrid('validateRow', index)) {
+        var fd = new FormData();
+        $('#logoPrints').datagrid('selectRow',index);
+        var row = $('#logoPrints').datagrid('getSelected');
+        var inputFile = $("#logo_pic_"+index);
+        var upFile = inputFile[0].files[0];
+        if (upFile) {
+            fd.append('file', upFile);
+        }
+        $('#logoPrints').datagrid('endEdit', index);
+
+        fd.append("logo_print_id", row.logo_print_id);
+        fd.append("logo_type", row.logo_type);
+        fd.append("logo_name", row.logo_name);
+        $.ajax({
+            url: '${cxt!}/admin/logoPrint/'+ (row.logo_print_id ? 'updateLogoPrint' : 'saveLogoPrint'),
+            data: fd,
+            processData: false,
+            contentType: false,
+            type: 'POST',
+            success: function(result){
+                if (result.errorMsg){
+                  $.messager.alert('Error', result.errorMsg);
+                  $('#logoPrints').datagrid('beginEdit', index);
+                } else {
+                  $('#logoPrints').datagrid('reload');      // reload data
+                }
+            }
+          });
+    } else {
+        $('#logoPrints').datagrid('beginEdit', index);
+    }
+  }
+  
+  
+  function cancelLogoPrint(target,index){
+    $('#logoPrints').datagrid('selectRow',index);
+    var row = $('#logoPrints').datagrid('getSelected');
+    if (row.logo_print_id) {
+      $('#logoPrints').datagrid('cancelEdit', index);
+    } else {
+      $('#logoPrints').datagrid('deleteRow', index);
+    }
+  }
+
+  function changeImg(obj) {
+    $(obj).siblings(":first").click();
+  }
+
+  function uploadFile(obj) {
+    var fi = obj.files[0];
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        $(obj).next().attr('src', e.target.result);
+    };
+    reader.readAsDataURL(fi);
+  }
+</script>

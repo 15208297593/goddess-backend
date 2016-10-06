@@ -1,0 +1,225 @@
+<% var toolbar = { %> 
+<%};
+var datagrid = { %> 
+    <span style="color:red">*先将需要导入的图片放在服务器指定文件夹下，再批量导入图片</span><br/>
+    <span style="color:red">*手动导入前，必须完成一次批量导入图片</span>
+    <table id="dg" title="" class="easyui-datagrid" style="width:820px;height:600px"
+        url="${cxt!}/admin/customize/listPrototypesWithTypes"
+        toolbar="#toolbar" pagination="true"
+        rownumbers="false" singleSelect="true">
+	    <thead>
+	        <tr>
+	            <th field="prototype_id" width="100">基础款ID</th>
+	            <th field="name" width="100">基础款名称</th>
+	            <th field="pic" width="150" formatter="formatPic" align="center">基础款图片</th>
+	            <th field="unimported_types" width="150">未导入图片属性类别</th>
+	            <th field="all_types" width="150">所有属性类别</th>
+	            <th field="action" width="150" formatter="actions" align="center">操作</th>
+	        </tr>
+	    </thead>
+    </table>
+<%};
+var dialog = { %> 
+    
+    <div class="easyui-layout" id="customizeLayout" style="height:900px">
+        <div data-options="region:'north',collapsible:false,border: false" style="height:300px"></div>
+        <div data-options="region:'center',collapsible:false,border: false" style="height:30px">
+	        <div style="text-align:right;margin-top:10px">
+	            <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-search" onclick="searchCustomizations()">检索定制</a>
+	        </div>
+        </div>
+        <div data-options="region:'south',collapsible:false,border: false" style="height:550px">
+        </div>
+    </div>
+<%};
+var otherDialogs = { %> 
+
+    <div id="otherdlg">
+    </div>
+
+<%};
+var dlg_buttons = { %> 
+    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-cancel" onclick="javascript:$('#dlg').dialog('close')" style="width:90px">关闭</a>
+<%};
+include("/listLayout.html",
+        {toolbar:toolbar,
+        datagrid:datagrid, 
+        dialog:dialog, 
+        dlg_buttons:dlg_buttons,
+        otherDialogs:otherDialogs,
+        dialog_title:"基础款定制"}){}
+%>
+
+<script type="text/javascript">
+
+  $(function(){
+    $('#fm').attr('enctype', 'multipart/form-data');
+    
+  });
+  
+  function formatPic(value, row, index) {
+	  if (!value) value="default.jpg";
+	  return '<img src="${imageUrl!}/' + value +'" style="width:150px;height:auto" >'
+  }
+  
+  function formatCustomizedProperty(value, row, index) {
+      
+      var formatValue = '';
+      // 去掉两侧的下划线
+      var propertyKey = value.substr(1,value.length-2);
+      propertyKey = propertyKey.split(/_/);
+      propertyKey.forEach(function(value, index){
+          var typeAndPro = value.split(/@/);
+          typeAndPro = typeAndMaterial[typeAndPro[0]][typeAndPro[1]];
+          // 颜色值
+          formatValue += "<div class='float-left' style='text-align:center; '>" + typeAndPro["type_name"];
+          if (typeAndPro["exhibition_type"] == "0") {
+              formatValue += "<div class='box' style='background-color:"+typeAndPro["material_exhibition"]+"'></div>";
+          } else {
+              formatValue += "<div style='padding:5px'><img src='"+typeAndPro["material_exhibition"]+"' style='width:100px;' /></div>";
+          }
+          formatValue += "<div>"+(typeAndPro["material_name"] || "")+"</div>";
+          formatValue += "</div>";
+      });
+      
+      return '<div style="margin:10px">' + formatValue + '</div>';
+  }
+  
+  function actions(value, row, index) {
+      var i = '<a href="#" onclick="importCustomizations(this,'+row.prototype_id+')">批量导入定制图片</a><br/> ';
+      var s = '<a href="#" onclick="manualImport(this,'+row.prototype_id+')">手动导入定制图片</a><br/> ';
+      var c = '<a href="#" onclick="customizeProperties(this,'+row.prototype_id+')">定制上架</a> ';
+      return i+s+c;
+  }
+  
+  function openCommodityDetail(index, property_key) {
+     $('#commoditydlg').dialog({
+         closed: false,
+         cache: false,
+         title: "商品上架",
+         modal:true,
+         href:"${cxt!}/admin/customize/getCustomizationForShelve/"+$("#prototype_id").val()+"-"+property_key
+     });
+  }
+  
+  function shelve() {
+    $('#commodityfm').form('submit',{
+      url: "${cxt!}/admin/customize/shelve/",
+      onSubmit: function(){
+        return $(this).form('validate');
+      },
+      success: function(result){
+        var result = eval('('+result+')');
+        if (result.errorMsg){
+          $.messager.alert('Error', result.errorMsg);
+        } else {
+          $('#commoditydlg').dialog('close');        // close the dialog
+          $('#customizedDg').datagrid('reload');      // reload data
+        }
+      }
+    });
+  }
+
+  function changeImg(obj) {
+    $(obj).prev().click();
+  }
+
+  function uploadFile(obj) {
+    var fi = obj.files[0];
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        $(obj).prev().attr('src', e.target.result);
+    };
+    reader.readAsDataURL(fi);
+  }
+
+  function customizeProperties(target, prototype_id){
+    var panel = $('#customizeLayout').layout('panel', 'north').panel('clear');
+    var href = "${cxt!}/admin/customize/getCustomizeProperties/"+prototype_id;
+    panel.panel({href:href});
+
+    $('#customizeLayout').layout('panel', 'south').panel('clear').panel({content:'<table id="customizedDg" style="height:500px"></table>'});
+    $('#dlg').dialog('open').dialog('setTitle','');
+  }
+  
+  function importCustomizations(target, prototype_id){
+    
+	  $.messager.progress({
+	    title: 'Please waiting',
+	    msg: 'Processing...',
+	    interval: 0  // disable auto update progress value
+	  });
+	  var bar = $.messager.progress('bar');  // get the progressbar object
+	  bar.progressbar('setValue', 80);  // set new progress value
+	  $.get('${cxt!}/admin/customize/saveCustomizations/'+prototype_id,function(result){
+        $.messager.progress('close');
+          if (result.errorMsg){
+            $.messager.alert( 'Error', result.errorMsg, 'error');
+          } else {
+            $.messager.alert('', '基础款【'+prototype_id+'】导入完成！', 'info');
+            $('#dg').datagrid('reload');      // reload data
+          }
+      },'json');
+  }
+
+  function manualImport(target, prototype_id) {
+
+    $('#otherdlg').dialog({
+	    title: '定制图片一览',
+	    width: 980,
+	    height: 730,
+	    closed: false,
+	    cache: false,
+	    href: '${cxt!}/admin/customize/searchCustomizedPic/'+prototype_id,
+	    modal: true,
+	    buttons:[
+	              {text:'关闭',
+	               iconCls:'icon-cancel',
+	               handler:function() {
+	            	   $('#otherdlg').dialog('close');
+	               }
+	              }
+	            ]
+	});
+  }
+
+  function checkUnselect() {
+    return $(":checkbox[name^='material_id_']").toArray().some(function(item, index) {
+                if ($(item).is(":checked")) {
+                    return true;
+                }
+                return false;
+            });
+  }
+  
+  function searchCustomizations(){
+    if (!checkUnselect()) {
+      $.messager.alert('WARNING', '请至少选择一个属性！', "warning");
+      return false;
+    }
+    $('#customizedDg').datagrid({
+        title:'',
+        iconCls:'icon-edit',
+        width:870,
+        height:500,
+        singleSelect:true,
+        pagination:true,
+        url:"${cxt!}/admin/customize/searchCustomizations?"+$("#searchForm").serialize(),
+        columns:[[
+            {field:'property_key',title:'定制属性',width:430,formatter:formatCustomizedProperty,align:'center'},
+            {field:'custome_pic',title:'定制图片',width:170,formatter:formatPic,align:'center'},
+            {field:'is_shelved',title:'状态',width:100,formatter:function(value){
+            	return value ? "已上架" : "未上架"
+            },align:'center'},
+            {field:'action',title:'操作',width:140,formatter:customizedActions,align:'center'}
+        ]]
+    });
+  }
+  
+  function customizedActions(value, row, index) {
+        if (!row.custome_pic)
+          return "<span class='break-line'>先导入定制图片，方可上架！</span>"; 
+        return (row.is_shelved ? '' : '<a class="c6" style="margin-left:10px" href="javascript:void(0)" onclick="openCommodityDetail('+index+',\''+row.property_key+'\')">商品上架</a>');
+  }
+  
+</script>

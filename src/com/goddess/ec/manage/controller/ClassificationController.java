@@ -1,0 +1,101 @@
+package com.goddess.ec.manage.controller;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.log4j.Logger;
+
+import com.goddess.ec.manage.annotation.Controller;
+import com.goddess.ec.manage.constants.AppConstants;
+import com.goddess.ec.manage.model.Classification;
+import com.goddess.ec.manage.tools.ToolSqlFormatter;
+import com.goddess.ec.manage.tools.ToolSqlXml;
+import com.jfinal.aop.Before;
+import com.jfinal.plugin.activerecord.Db;
+import com.jfinal.plugin.activerecord.Record;
+import com.jfinal.plugin.activerecord.tx.Tx;
+
+@Controller(controllerKey = "/admin/classification")
+public class ClassificationController extends BaseController {
+
+    @SuppressWarnings("unused")
+    private static Logger log = Logger.getLogger(ClassificationController.class);
+
+    /**
+     * 订单列表
+     */
+    public void index() {
+    	render("/classification/classificationTree.html");
+    }
+    
+    public void classificationTree() {
+    	
+    	String category = getPara("category", AppConstants.CATEGORY_BAG);
+    	List<Record> allClassification = Db.find(ToolSqlXml.getSql("manage.classification.getClassificationByCategory"), category);
+    	Map<Integer, Record> nodeMap = new HashMap<Integer, Record>();
+    	List<Record> classificationTree = new ArrayList<Record>();
+    	for (Record r : allClassification) {
+    		Integer parentId = r.getInt("parent_id");
+
+			nodeMap.put(r.getInt("id"), r);
+    		if (parentId != 0) {
+
+    			Record node = nodeMap.get(parentId);
+    			List<Record> children = node.get("children");
+    			if (children == null) {
+    				children = new ArrayList<Record>();
+    				node.set("children", children);
+    			}
+    			children.add(r);
+    		// 0级结点，父结点为0
+    		} else {
+    			classificationTree.add(r);
+    		}
+    	}
+
+    	render("/classification/classificationTree.html");
+        renderJson(classificationTree);
+    }
+    
+    public void saveClassification() {
+    	String category = getPara(0);
+    	Classification ca = new Classification();
+    	ca.set("classification_name", getPara("name")).set(
+    			"rank", getParaToInt("rank")).set(
+    			"classification_level", getParaToInt("level")).set(
+				"category", category).set(
+    			"parent_id", getParaToInt("parent_id"));
+    	
+    	ca.save();
+    	renderJson(new String[]{});
+    }
+    
+    public void updateClassification() {
+
+    	Classification ca = Classification.dao.findById(getParaToInt("id"));
+    	ca.set("classification_name", getPara("name")).set(
+    			"rank", getParaToInt("rank"));
+    	ca.update();
+    	renderJson(new String[]{});
+    }
+    
+    /**
+     * 删除该目录及其子目录（id1_id2_id3...）
+     */
+    @Before(Tx.class)
+    public void deleteClassification() {
+    	
+    	// 删除该目录及其子目录
+    	String[] ids = getPara(0).split("_");
+    	Map<String, Object> params = new HashMap<String, Object>();
+    	params.put("ids", ToolSqlFormatter.formatInPart(ids.length));
+    	Db.update(ToolSqlXml.getSql("manage.classification.deleteClassifications", params), ids);
+    	
+    	// 删除商品目录
+    	Db.update(ToolSqlXml.getSql("manage.classification.deleteCommodityClassifications", params), ids);
+
+    	renderJson(new String[]{});
+    }
+}

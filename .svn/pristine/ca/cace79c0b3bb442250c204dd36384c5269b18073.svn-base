@@ -1,0 +1,44 @@
+package com.goddess.ec.manage.model;
+
+
+public enum OrderStatus {
+
+	DEPOSIT_PAID("!", "订金已支付"),
+	
+	UNPAID("0", "未支付"),
+
+	UNSHIPPED("1", "生产中"),
+	
+    SHIPPED("2", "已发货"),
+	
+    SUCCESS("3", "已收货"),
+	
+    CANCEL("4", "已取消"),
+    
+    RETURN("5", "已退货");
+	
+	private String _code;
+	private String _text;
+	
+	private OrderStatus(String code, String text) {
+		this._code = code;
+		this._text = text;
+	}
+	
+	public String getCode() {
+		return _code;
+	}
+	
+	public String getText() {
+		return _text;
+	}
+	
+	public static OrderStatus getEnumByCode(String code) {
+		OrderStatus[] types = OrderStatus.values();
+		for (OrderStatus t : types) {
+			if (t.getCode().equals(code))
+				return t;
+		}
+		return null;
+	}
+}

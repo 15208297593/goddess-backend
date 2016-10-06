@@ -1,0 +1,203 @@
+<% var toolbar = { %> 
+    
+  <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-add" onclick="insertManufacturer()">添加新生产商</a>
+<%};
+var dialog = { %> 
+<%};
+var datagrid = { %> 
+    <table id="dg">
+    </table>
+<%};
+var dlg_buttons = { %> 
+<%};
+var otherDialogs = { %> 
+<%};
+include("/listLayout.html",
+        {toolbar:toolbar,
+        dialog:dialog, 
+        datagrid:datagrid,
+        dlg_buttons:dlg_buttons,
+        otherDialogs:otherDialogs,
+        dialog_title:""}){}
+%>
+
+<script type="text/javascript">
+
+  $(function(){
+    $('#fm').attr('enctype', 'multipart/form-data');
+    
+    var manufacture_type = [{name:"包", value:1}];
+    $('#dg').datagrid({
+        title:'',
+        iconCls:'icon-edit',
+        width:720,
+        height:250,
+        singleSelect:true,
+        idField:'manufacturer_id',
+        url:'${cxt!}/admin/manufacturer/getManufacturers',
+        columns:[[
+            {field:'manufacturer_id',title:'id',width:50},
+            {field:'manufacturer_name',title:'生产商名称',width:150,
+              editor:{
+                type:'validatebox',
+                options:{
+                  required:true,
+                  validType:'maxLength[100]'
+                }
+              }
+            },
+            {field:'manufacturer_email',title:'生产商邮件',width:220,
+              editor:{
+                type:'validatebox',
+                options:{
+                  required:true,
+                  validType:['maxLength[50]','email']
+                }
+              }
+            },
+            {field:'manufacture_type',title:'生产类别',width:120,
+                formatter:function(value){
+                    for(var i=0; i<manufacture_type.length; i++){
+                        if (manufacture_type[i].value == value) return manufacture_type[i].name;
+                    }
+                    return value;
+                },
+                editor:{
+                    type:'combobox',
+                    options:{
+                        valueField:'value',
+                        textField:'name',
+                        data:manufacture_type,
+                        editable:false
+                    }
+                }
+            },
+            {field:'action',title:'操作',width:150,align:'center',
+                formatter:function(value,row,index){
+                    if (row.editing){
+                        var s = '<a href="#" onclick="saveManufacturer(this,'+index+')">保存</a> ';
+                        var c = '<a href="#" onclick="cancelManufacturer(this,'+index+')">取消</a>';
+                        return s+c;
+                    } else {
+                        var e = '<a href="#" onclick="editManufacturer(this,'+index+')">编辑</a> ';
+                        var d = '<a href="#" onclick="deleteManufacturer(this,'+index+')">删除</a> ';
+                        return e+d;
+                    }
+                }
+            }
+        ]],
+        onBeforeEdit:function(index,row){
+            row.editing = true;
+            updateActions(index);
+        },
+        onAfterEdit:function(index,row){
+            row.editing = false;
+            //updateActions(index);
+        },
+        onEndEdit:function(index,row){
+            row.editing = false;
+            //updateActions(index);
+        },
+        
+        onCancelEdit:function(index,row){
+            row.editing = false;
+            updateActions(index);
+        }
+    });
+  });
+  
+
+  function updateActions(index, row, table){
+    var targetTable = $('#dg');
+    if (table) targetTable = $('#' + table);
+    targetTable.datagrid('updateRow',{
+          index: index,
+          row: row ? row : {}
+      });
+  }
+  
+  function getRowIndex(target){
+    var tr = $(target).closest('tr.datagrid-row');
+    return parseInt(tr.attr('datagrid-row-index'));
+  }
+  function editManufacturer(target, index){
+      $('#dg').datagrid('selectRow',index);
+      $('#dg').datagrid('beginEdit', index);
+  }
+  function deleteManufacturer(target,index){
+    $('#dg').datagrid('selectRow',index);
+    var row = $('#dg').datagrid('getSelected');
+    $.messager.confirm('删除生产商','确定删除该生产商吗?',function(r){
+        if (r){
+            // 删除生产商
+            $.get('${cxt!}/admin/manufacturer/deleteManufacturer/' + row.manufacturer_id,
+            function(result){
+              if (result.errorMsg){
+                $.messager.alert( 'Error', result.errorMsg);
+              } else {
+                $('#dg').datagrid('deleteRow', index);
+              }
+            },'json');
+        }
+    });
+  }
+  
+  function saveManufacturer(target,index){
+    // ajax保存
+    $('#dg').datagrid('selectRow',index);
+    var row = $('#dg').datagrid('getSelected');
+    if ($('#dg').datagrid('validateRow', index)) {
+      $('#dg').datagrid('endEdit', index);
+      if (row.manufacturer_id) {
+        // 更新生产商
+        $.post('${cxt!}/admin/manufacturer/updateManufacturer',
+            {manufacturer_id:row.manufacturer_id,
+        	manufacturer_name:row.manufacturer_name,
+        	manufacture_type:row.manufacture_type,
+        	manufacturer_email:row.manufacturer_email},function(result){
+          if (result.errorMsg){
+            $.messager.alert( 'Error', result.errorMsg);
+            $('#dg').datagrid('beginEdit', index);
+          } else {
+            $('#dg').datagrid('endEdit', index);
+          }
+        },'json');
+      } else {
+        // 添加新生产商
+        $.post('${cxt!}/admin/manufacturer/saveManufacturer',
+            {manufacturer_name:row.manufacturer_name,
+            manufacture_type:row.manufacture_type,
+            manufacturer_email:row.manufacturer_email},function(result){
+          if (result.errorMsg){
+            $.messager.alert( 'Error', result.errorMsg);
+            $('#dg').datagrid('beginEdit', index);
+          } else {
+            row.manufacturer_id = result.manufacturer.manufacturer_id
+            updateActions(index, row);
+          }
+        },'json');
+      }
+    }
+  }
+  
+  function cancelManufacturer(target,index){
+    $('#dg').datagrid('selectRow',index);
+    var row = $('#dg').datagrid('getSelected');
+    if (row.manufacturer_id) {
+      $('#dg').datagrid('cancelEdit', index);
+    } else {
+      $('#dg').datagrid('deleteRow', index);
+    }
+  }
+
+  function insertManufacturer(){
+    var index = 0;
+    $('#dg').datagrid('insertRow', {
+        index: index,
+        row:{manufacture_type:1}
+    });
+    $('#dg').datagrid('selectRow',index);
+    $('#dg').datagrid('beginEdit',index);
+  }
+  
+</script>

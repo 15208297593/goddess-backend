@@ -1,0 +1,68 @@
+<% for (c in order_commodities) { %>
+    <div>
+        <div style="float:left;">
+            <img src="${imageUrl!}/${c.commodity_pic}" style="width:200px;">
+        </div>
+        <div style="float:left;padding:10px">
+            <% if (!isEmpty(c.base_properties)) { %>
+                <% for (p in c.base_properties) { %>
+                    <div style='padding-top:5px'>${p.key!}:${p.value!}</div>
+                <% } %>
+            <% } %>
+            <% if (!isEmpty(c.customize_properties)) { %>
+                <% for (p in c.customize_properties) { %>
+                  <div style='padding-top:5px'>
+                    <div style="float:left;padding-right:5px">${p.type_name!}:${p.material_name!}</div>
+                    <% if (!isEmpty(p.material_exhibition)) { %>
+	                    <div style="float:left">
+	                        <% if (p.exhibition_type == "0") { %>
+	                            <div class='box' style='background-color:${p.material_exhibition}'></div>
+	                        <% } else { %>
+	                            <img src="${imageUrl!}/${p.material_exhibition}" style="width:40px">
+	                        <% } %>
+	                    </div>
+                    <% } %>
+                  </div>
+                  <div style="clear:both"></div>
+                <% } %>
+            <% } %>
+	        <% if (!isEmpty(c.user_printing)) { %>
+                <div style='padding-top:5px'>
+                    <div style="float:left;padding-right:5px">用户印花:</div>
+		            <div style="float:left;">
+		                <img src="${imageUrl!}/${c.user_printing}" style="width:100px;">
+		            </div>
+	            </div>
+	        <% } %>
+        </div>
+        <div style="float:left;padding:10px;">
+            <div style='padding-top:5px'>购买方式:${isEmpty(c.commodity_id) ? "定制购买" : "商品购买"}</div>
+            <div style='padding-top:5px'>名称:${c.commodity_name}</div>
+            <div style='padding-top:5px'>价格:${c.price}</div>
+            <div style='padding-top:5px'>购买数量:${c.purchase_amount}</div>
+        </div>
+        <% if (!isEmpty(c.logo_style)) { %>
+	        <ul style="float:left;list-style-type:none">
+                <div style='padding-top:5px'>logo内容:${c.logo_content}</div>
+	            <% for (l in c.logo_style) { %>
+			        <li style="float:left;text-align:center">
+			            <img src="${imageUrl!}/${l.accessory_pic}" style="width:100px;">
+			            <p>￥${l.accessory_price!0} ${l.accessory_name}</p>
+			        </li>
+                <% } %>
+	        </ul>
+        <% } %>
+        <% if (!isEmpty(c.inside_slot)) { %>
+            <ul style="float:left;list-style-type:none">
+                <div style='padding-top:5px'>定制开格</div>
+                <% for (l in c.inside_slot) { %>
+                    <li style="float:left;text-align:center">
+                        <img src="${imageUrl!}/${l.accessory_pic}" style="width:100px;">
+                        <p>￥${l.accessory_price!0} ${l.accessory_name}</p>
+                    </li>
+                <% } %>
+            </ul>
+        <% } %>
+    </div>
+    <div style="clear:both"></div>
+<% } %>

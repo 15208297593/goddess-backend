@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<sql-statement namespace="manage.customize">
+
+    <!-- 原型及其属性类别分页列表 -->
+    <sql id="splitPage">
+        <![CDATA[
+              FROM (
+	            SELECT p.prototype_id,p.prototype_name,p.prototype_pic,mt.type_name,pt.rank,mt.material_type_id
+	              FROM property_type pt,material_type mt,prototype p
+	             WHERE p.prototype_id = pt.prototype_id
+	               AND pt.material_type_id = mt.material_type_id
+	               AND p.delete_flag = '0'
+	               AND mt.delete_flag = '0'
+	               ) ap
+         LEFT JOIN customization c
+                ON ap.prototype_id = c.prototype_id
+               AND c.property_key like concat('%_', CAST(ap.material_type_id AS CHAR), '@%')
+          GROUP BY ap.prototype_id
+        ]]>
+    </sql>
+    
+    <!-- 取得某个原型的属性及其类别 -->
+    <sql id="getPropertiesByPrototypeId">
+        <![CDATA[
+            SELECT pt.property_type_id,
+                   mt.material_type_id,
+                   mt.type_name,
+                   mt.exhibition_type,
+                   p.property_id,
+                   m.material_id,
+                   m.material_name,
+                   m.material_exhibition
+              FROM property_type pt, properties p, material_type mt, materials m
+             WHERE p.material_id = m.material_id
+               AND pt.property_type_id = p.property_type_id
+               AND mt.material_type_id = m.material_type_id
+               AND pt.material_type_id = mt.material_type_id
+               AND pt.prototype_id = ?
+               AND mt.delete_flag = '0'
+               AND m.delete_flag = '0'
+          ORDER BY pt.rank DESC,
+                   mt.material_type_id,
+                   p.rank DESC,
+                   m.material_id
+        ]]>
+    </sql>
+
+    <!-- 该原型是否已经生成定制品 -->
+    <sql id="isPrototypeCustomized">
+        <![CDATA[
+            SELECT prototype_id
+              FROM customization 
+             WHERE prototype_id = ?
+             LIMIT 1
+        ]]>
+    </sql>
+
+    <!-- 取得未导入图片的定制品 -->
+    <sql id="getCustomizedPic">
+        <![CDATA[
+              FROM customization c, prototype p
+             WHERE c.prototype_id = p.prototype_id
+             <% if(isEmpty(is_imported)){ %>
+             <% }else if(is_imported == '0'){ %>
+               AND c.custome_pic IS NULL
+             <% }else if(is_imported == '1'){ %>
+               AND c.custome_pic IS NOT NULL
+             <% } %>
+             <% if(!isEmpty(requireSearchStr)){ %>
+               AND c.property_key like #'$requireSearchStr$'#
+             <% } %>
+               AND c.prototype_id = #'$prototype_id$'#
+        ]]>
+    </sql>
+
+    <!-- 必选类别的原材料类别 -->
+    <sql id="getRequiredPro">
+        <![CDATA[
+            SELECT mt.material_type_id
+              FROM property_type pt,material_type mt
+             WHERE pt.material_type_id = mt.material_type_id
+               AND pt.prototype_id = ?
+               AND pt.is_required = '1'
+               AND mt.delete_flag = '0'
+        ]]>
+    </sql>
+    
+    <!-- 根据属性串检索定制品 -->
+    <sql id="searchCustomizationsByPropertyKey">
+        <![CDATA[
+              FROM customization c
+         LEFT JOIN commodities co
+                ON c.prototype_id = co.prototype_id
+               AND c.property_key = co.property_key
+               AND co.is_shelved = #'$is_shelved$'#
+             WHERE find_in_set(c.property_key, #'$property_key$'#)
+               AND c.prototype_id = #'$prototype_id$'#
+        ]]>
+    </sql>
+
+    <!-- 取得未定制的新添加的属性组合 -->
+    <sql id="getUnCustomizedCombination">
+        <![CDATA[
+            SELECT ap.material_type_id,
+                   ap.exhibition_type,
+                   ap.type_property
+              FROM (SELECT pt.material_type_id,
+                           pt.is_required,
+                           pt.default_material_id,
+                           mt.exhibition_type,
+		                   CAST(CONCAT('_', mt.material_type_id, '@', m.material_id) AS CHAR) as type_property
+		              FROM property_type pt, properties p, material_type mt, materials m
+		             WHERE p.material_id = m.material_id
+		               AND pt.property_type_id = p.property_type_id
+		               AND mt.material_type_id = m.material_type_id
+		               AND pt.material_type_id = mt.material_type_id
+		               AND pt.prototype_id = ?
+		               AND mt.delete_flag = '0'
+		               AND m.delete_flag = '0') ap
+         LEFT JOIN customization c
+                ON CONCAT(ap.type_property, '_') = c.property_key
+               AND c.prototype_id = ?
+             WHERE c.property_key IS NULL
+        ]]>
+    </sql>
+    
+    <!-- 取得某个原型的属性组合 -->
+    <sql id="getPropertiesCombination">
+        <![CDATA[
+            SELECT pt.material_type_id,
+                   mt.exhibition_type,
+                   CAST(CONCAT('_', mt.material_type_id, '@', m.material_id) AS CHAR) as type_property
+              FROM property_type pt, properties p, material_type mt, materials m
+             WHERE pt.property_type_id = p.property_type_id
+               AND mt.material_type_id = m.material_type_id
+               AND pt.material_type_id = mt.material_type_id
+               AND p.material_id = m.material_id
+               AND pt.prototype_id = ?
+               AND mt.delete_flag = '0'
+               AND m.delete_flag = '0'
+          ORDER BY material_type_id
+        ]]>
+    </sql>
+    
+    <!-- 取得某个原型的原材料组合 -->
+    <sql id="getMaterialCombination">
+        <![CDATA[
+            SELECT mt.material_type_id,
+                   mt.type_name,
+                   mt.exhibition_type,
+                   m.material_id,
+                   m.material_name,
+                   if(mt.exhibition_type = ?, m.material_exhibition ,CONCAT (?, m.material_exhibition)) as material_exhibition
+              FROM material_type mt, materials m
+             WHERE mt.material_type_id = m.material_type_id
+               AND mt.delete_flag = '0'
+               AND m.delete_flag = '0'
+          ORDER BY material_type_id
+        ]]>
+    </sql>
+    
+    <!-- 取得某个原材料的属性 -->
+    <sql id="getMaterialAttrByMid">
+        <![CDATA[
+            SELECT mt.material_type_id,
+                   mt.type_name,
+                   mt.exhibition_type,
+                   m.material_id,
+                   m.material_name,
+                   m.material_exhibition
+              FROM material_type mt, materials m
+             WHERE mt.material_type_id = m.material_type_id
+               AND m.material_id = ?
+        ]]>
+    </sql>
+    
+    <sql id="saveCustomizations">
+        <![CDATA[
+            INSERT INTO customization(prototype_id, property_key, custome_pic) VALUES(?, ?, ?)
+        ]]>
+    </sql>
+    <sql id="saveCustomizationProperties">
+        <![CDATA[
+            INSERT INTO customization_properties(user_customization_id,prototype_id, material_type_id,material_id) VALUES(?, ?, ?, ?)
+        ]]>
+    </sql>
+    <sql id="saveOrderAccessories">
+        <![CDATA[
+            INSERT INTO order_accessory(order_commodity_id, accessory_name, accessory_type, accessory_price, accessory_pic) VALUES(?, ?, ?, ?, ?)
+        ]]>
+    </sql>
+
+    <sql id="deleteCustomizationProperties">
+        <![CDATA[
+            DELETE FROM customization_properties WHERE user_customization_id = ?
+        ]]>
+    </sql>
+
+    <sql id="deleteOrderAccs">
+        <![CDATA[
+            DELETE FROM order_accessory WHERE order_commodity_id = ?
+        ]]>
+    </sql>
+
+    <sql id="getAllMaterialTypes">
+        <![CDATA[
+            SELECT * 
+              FROM material_type 
+             WHERE delete_flag = ?
+        ]]>
+    </sql>
+    
+    <sql id="updateCustomizations">
+        <![CDATA[
+            UPDATE customization
+               SET custome_pic = ?
+             WHERE prototype_id = ?
+               AND property_key = ?
+        ]]>
+    </sql>
+    
+    <!-- 取得定制图片 -->
+    <sql id="getCustomization">
+        <![CDATA[
+            SELECT custome_pic
+              FROM customization
+             WHERE prototype_id = ?
+               AND property_key = ?
+        ]]>
+    </sql>
+    <!-- 取得该定制关键字串的价格加成 -->
+    <sql id="getPriceAddition">
+        <![CDATA[
+            SELECT sum(ifnull(price_addition, 0)) as price_addition
+              FROM materials
+             WHERE concat(cast(material_type_id as char), '@', cast(material_id as char)) in ${keys}
+        ]]>
+    </sql>
+
+    <!-- 更改图片名称用 -->
+    <sql id="genPic">
+        <![CDATA[ 
+            select 
+			    concat(cast(mt.material_type_id as char), '@', cast(m.material_id as char)) as idStr,
+			    concat(mt.type_name ,'@',  m.material_name) as nameStr
+			from
+			    material_type mt,
+			    materials m
+			where
+			    mt.material_type_id = m.material_type_id
+			        and mt.delete_flag = '0'
+			        and m.delete_flag = '0'
+			order by mt.material_type_id
+        ]]>
+    </sql>
+
+</sql-statement>

@@ -1,0 +1,375 @@
+package com.goddess.ec.manage.controller;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.log4j.Logger;
+
+import com.alibaba.druid.support.json.JSONUtils;
+import com.alibaba.fastjson.JSONObject;
+import com.goddess.ec.manage.annotation.Controller;
+import com.goddess.ec.manage.constants.AppConstants;
+import com.goddess.ec.manage.model.MaterialType;
+import com.goddess.ec.manage.model.PropertyType;
+import com.goddess.ec.manage.model.Prototype;
+import com.goddess.ec.manage.service.PropertyService;
+import com.goddess.ec.manage.service.PrototypeService;
+import com.goddess.ec.manage.tools.ToolSqlXml;
+import com.goddess.ec.manage.tools.ToolWeb;
+import com.jfinal.aop.Before;
+import com.jfinal.kit.JsonKit;
+import com.jfinal.plugin.activerecord.Db;
+import com.jfinal.plugin.activerecord.Record;
+import com.jfinal.plugin.activerecord.tx.Tx;
+
+/**
+ * 原型配置管理
+ */
+@Controller(controllerKey = "/admin/cusConfigure")
+public class CusConfigureController extends BaseController {
+
+    @SuppressWarnings("unused")
+    private static Logger log = Logger.getLogger(CusConfigureController.class);
+    
+    public void getPropertyTypes() {
+
+    	int prototypeId = getParaToInt(0);
+    	setAttr("prototype_id", prototypeId);
+//    	TODO render("/prototype/newPropertyTypes.html");
+    	render("/prototype/newPropertyTypes2.html");
+    
+    }
+    
+    public void getNewPropertyTypes() {
+    	
+    	int prototypeId = getParaToInt(0);
+    	Map<String, Object> jsonRes = new HashMap<String, Object>();
+    	List<PropertyType> types = PropertyType.dao.find(ToolSqlXml.getSql("manage.prototype.getPropertyTypesByPid"), prototypeId);
+    	jsonRes.put("total", types.size());
+    	jsonRes.put("rows",  types);
+    	renderJson(jsonRes);
+    }
+    
+    public void getPropertyTypesByPid() {
+
+    	int prototypeId = getParaToInt(0);
+        Map<String, Object> jsonRes = new HashMap<String, Object>();
+    	List<PropertyType> types = PropertyType.dao.find(ToolSqlXml.getSql("manage.prototype.getBaseAndTypesByPid"), prototypeId);
+		jsonRes.put("total", types.size());
+		jsonRes.put("rows",  types);
+        renderJson(jsonRes);
+    }
+    
+
+    /**
+     * 初始化属性类别详情页
+     */
+    public void getPropertyType() {
+    	int propertyTypeId = getParaToInt(0, 0);
+    	int prototypeId = getParaToInt(1);
+    	// 已有属性类别
+    	if (propertyTypeId != 0) {
+    		Record pt = Db.findFirst(ToolSqlXml.getSql("manage.property.getPropertyTypesByPtid"), propertyTypeId);
+    		setAttr("property_type", pt);
+    	} else {
+    		Record pt = new Record();
+    		pt.set("prototype_id", prototypeId);
+    		setAttr("property_type", pt);
+    	}
+    	// 已添加类别的非子类别，剔除自身
+    	setAttr("relate_types", Db.find(ToolSqlXml.getSql("manage.prototype.getRelateTypesWithoutSelf"), prototypeId, propertyTypeId));
+    	setAttr("ref_types", JsonKit.toJson(Db.find(ToolSqlXml.getSql("manage.property.getRefTypes"))));
+    	render("/prototype/propertyType.html");
+    }
+
+    @Before(Tx.class)
+    public void savePropertyTypeByPid() {
+
+    	String isBase = getPara("is_base");
+    	PropertyType pt = new PropertyType();
+
+    	pt.set("prototype_id", getPara("prototype_id"));
+    	pt.set("type_name", getPara("type_name"));
+    	pt.set("type_name_ext", getPara("type_name_ext"));
+    	pt.set("rank", getParaToInt("rank", 0));
+		pt.set("is_ref", "0");
+		pt.set("is_base", isBase);
+		pt.set("is_required", getPara("is_required", "0"));
+		pt.set("conflict_type", getPara("conflict_type"));
+		pt.set("conflict_alert", getPara("conflict_alert"));
+		pt.set("base_ref_type", getParaToInt("ref_type_id"));
+		pt.save();
+		
+		renderJson(new String[]{"errorMsg"});
+    }
+
+    @Before(Tx.class)
+    public void updatePropertyTypeByPid() {
+    	
+    	String isBase = getPara("is_base");
+    	PropertyType pt = PropertyType.dao.findById(getParaToInt("property_type_id"));
+    	
+    	pt.set("type_name", getPara("type_name"));
+    	pt.set("type_name_ext", getPara("type_name_ext"));
+    	pt.set("rank", getPara("rank"));
+    	pt.set("is_base", isBase);
+		pt.set("is_required", getPara("is_required", "0"));
+		pt.set("conflict_type", getPara("conflict_type"));
+		pt.set("conflict_alert", getPara("conflict_alert"));
+    	pt.set("base_ref_type", getParaToInt("ref_type_id"));
+    	pt.update();
+    	
+    	renderJson(new String[]{"errorMsg"});
+    }
+    
+    /**
+     * 删除类别
+     */
+    @Before(Tx.class)
+    public void deletePropertyType() {
+    	Integer propertyTypeId = getParaToInt(0);
+    	String isBase = getPara(1);
+    	
+    	// 删除该类别及其属性
+    	PropertyType.dao.deleteById(propertyTypeId);
+    	PropertyService.service.deletePropertiesByType(propertyTypeId);
+    	
+    	// 删除该类别的关联类别
+    	if (AppConstants.IS_BASE_YES.equals(isBase)) {
+    		PrototypeService.service.deleteRelateType(propertyTypeId, null);
+    	} else {
+    		PrototypeService.service.deleteRelateType(null, propertyTypeId);
+    	}
+    	renderJson(new String[]{"errorMsg"});
+    }
+    
+    public void linkBase() {
+
+    	setAttr("base_ref_type", getParaToInt(0));
+    	setAttr("base_type", getParaToInt(3));
+    	setAttr("exhibition_type", getPara(2));
+    	setAttr("relate_types", Db.find(ToolSqlXml.getSql("manage.prototype.getRelateTypes"), getParaToInt(1)));
+    	setAttr("ref_types", Db.find(ToolSqlXml.getSql("manage.property.getRefTypes")));
+    	render("/prototype/baseRelateType.html");
+    }
+    
+    public void getBaseMaterials() {
+
+    	int baseType = getParaToInt(0);
+    	int baseRefType = getParaToInt(1);
+        Map<String, Object> jsonRes = new HashMap<String, Object>();
+    	List<Record> baseMaterials = Db.find(ToolSqlXml.getSql("manage.prototype.getBaseMaterials"), baseType, baseRefType);
+		jsonRes.put("total", baseMaterials.size());
+		jsonRes.put("rows",  baseMaterials);
+        renderJson(jsonRes);
+    }
+
+    @Before(Tx.class)
+    public void saveBaseRelateType() {
+
+    	String[] pids = getPara("pids").split(",");
+    	Integer baseType = getParaToInt("base_type");
+    	Integer price = getParaToInt("price_addition");
+
+		Map<String, String> params = ToolWeb.getParamMap(getRequest());
+		for (String key : params.keySet()) {
+			// 对于每一个类别分别设定
+			if (key.startsWith("relate_ref_type_")) {
+		    	
+		    	Integer relateType = Integer.valueOf(key.replace("relate_ref_type_", ""));
+		    	// 不关联该类别，删除之前关联上的数据记录
+				if (StringUtils.isEmpty(params.get(key))) {
+					PrototypeService.service.deleteBaseRelateTypes(baseType, relateType, pids);
+					continue;
+				}
+		    	Integer relateRefType = Integer.valueOf(params.get(key));
+		    	List<Record> existsRecords = PrototypeService.service.getBaseRelateTypes(baseType, relateType, pids);
+		    	List<Record> updateRecords = new ArrayList<Record>();
+		    	List<Record> insertRecords = new ArrayList<Record>();
+		    	for (String pid : pids) {
+		    		boolean exists = false;
+		    		for (Record r : existsRecords) {
+		    			int id = r.getInt("base_property_id");
+		    			if (id == Integer.valueOf(pid).intValue()) {
+		    				updateRecords.add(r);
+	    					r.set("relate_type", relateType).set("relate_ref_type", relateRefType);
+	    					r.set("price_addition", price);
+		    				exists = true;
+		    				break;
+		    			}
+		    		}
+		    		if (!exists) {
+		    			Record nRecord = new Record().set("base_type", baseType).set(
+		    											"relate_type", relateType).set(
+		    											"relate_ref_type", relateRefType).set(
+		    											"price_addition", price).set(
+		    											"base_property_id", Integer.valueOf(pid));
+		    			insertRecords.add(nRecord);
+		    		}
+		    	}
+		    	if (updateRecords.size() != 0) {
+					Db.batch(ToolSqlXml.getSql("manage.prototype.updateBaseRelateType"), "relate_ref_type,price_addition,base_type,base_property_id,relate_type", updateRecords, updateRecords.size());
+		    	}
+		    	if (insertRecords.size() != 0)
+		    		Db.batch(ToolSqlXml.getSql("manage.prototype.insertBaseRelateType"), "base_type,base_property_id,relate_type,relate_ref_type,price_addition", insertRecords, insertRecords.size());
+			}
+		}
+    	renderJson(new String[]{"errorMsg"});
+    }
+    
+    /**
+     * 根据所选原材料类别，取得冲突类别及所有原材料属性
+     */
+    public void getMaterialsAndType() {
+
+    	int materialTypeId = getParaToInt(0);
+    	int propertyTypeId = getParaToInt(1, 0);
+    	int prototypeId = getParaToInt(2);
+		List<Record> otherTypes = Db.find(ToolSqlXml.getSql("manage.prototype.getPropertyTypesWithoutSelf"), materialTypeId, prototypeId);
+		// 冲突类型
+		if (propertyTypeId != 0) {
+			Record pt = Db.findFirst(ToolSqlXml.getSql("manage.prototype.getPropertyTypesByPtid"), propertyTypeId);
+    		setAttr("property_type", pt);
+			String conflictType = pt.getStr("conflict_type");
+			if (StringUtils.isNotEmpty(conflictType)) {
+				Map<String, Object> ct = (Map<String, Object>)JSONUtils.parse(conflictType);
+				for (Record r : otherTypes) {
+					Object mid = ct.get(r.getInt("material_type_id").toString());
+					// 有冲突
+					if (mid != null) {
+						r.set("is_conflict", "1");
+						r.set("replace_material_id", mid);
+					}
+				}
+			}
+		}
+    	List<Record> properties = PrototypeService.service.getProperties(materialTypeId, propertyTypeId);
+    	setAttr("properties", properties);
+//    	setAttr("property_rank", propertyTypeId == 0 ? "" : PrototypeService.service.getPropertyRank(propertyTypeId));
+    	setAttr("conflict_type", otherTypes);
+    	setAttr("property_type_id", propertyTypeId);
+    	setAttr("exhibition_type", MaterialType.dao.findById(materialTypeId).getStr("exhibition_type"));
+    	render("/prototype/materialsAndType.html");
+    }
+    
+    private void createPropertyType(PropertyType pt, Integer parentTypeId, Integer materialTypeId) {
+
+    	pt.set("type_name", getPara("type_name"));
+    	pt.set("type_name_ext", getPara("type_name_ext"));
+    	pt.set("prototype_id", getParaToInt("prototype_id"));
+    	pt.set("parent_type_id", parentTypeId);
+		pt.set("material_type_id", materialTypeId);
+		pt.set("rank", getParaToInt("type_rank", 0));
+		pt.set("is_required", getPara("is_required", "0"));
+		pt.set("default_material_id", getParaToInt("default_material_id"));
+		// 针对不同商品的原材料用料比例
+		pt.set("material_amount", getParaToInt("material_amount", 100));
+    }
+    
+    private void updateConflictType(PropertyType pt, Map<String, String> params) {
+
+		JSONObject conflictType = new JSONObject();
+		for (String key : params.keySet()) {
+			if (key.startsWith("conflict_type_")) {
+				String mtId = params.get(key);
+				conflictType.put(mtId, params.get("replace_material_id_"+mtId));
+			}
+		}
+		// 更新冲突类型
+		pt.set("conflict_type", conflictType.size() == 0 ? null : conflictType.toJSONString()).set(
+				"conflict_alert", getPara("conflict_alert"));
+    }
+    
+    @Before(Tx.class)
+    public void updateTypeRank() {
+    	
+    	int prototypeId = getParaToInt(0);
+    	String ranks = getPara(1);
+    	String[] rankArray = ranks.split(",");
+
+		List<Record> updateTypes = new ArrayList<Record>();
+		for (int i = rankArray.length, j = 1; i > 0; i--,j++) {
+			updateTypes.add(new Record().set("property_type_id", Integer.valueOf(rankArray[i-1])).set("rank", j));
+		}
+		int[] result = PrototypeService.service.updateTypeRank(updateTypes);
+		int r = 0;
+		while (r < result.length && result[r] == AppConstants.OK)
+			r++;
+		if (r < result.length) {
+			setAttr("errorMsg", "部分属性类别更新失败！");
+		}
+		ranks = PrototypeService.service.getTypeRank(prototypeId);
+		setAttr("ranks", ranks);
+		renderJson(new String[]{"errorMsg", "ranks"});
+    }
+    
+    /**
+     * 一键复制其他基础款属性
+     */
+    @Before(Tx.class)
+    public void copyProperties() {
+
+    	int sourceId = getParaToInt(0);
+    	int targetId = getParaToInt(1);
+    	
+    	if (Prototype.dao.findById(sourceId, "prototype_id") == null) {
+    		setAttr("errorMsg", "复制源基础款不存在！");
+    		renderJson(new String[]{"errorMsg"});
+    		return;
+    	}
+    	
+    	// 取得基础属性类别
+    	List<Record> propertyTypes = Db.find(ToolSqlXml.getSql("manage.prototype.getPropertyTypeForCopy"), sourceId);
+    	if (propertyTypes.size() == 0) {
+    		setAttr("errorMsg", "复制源基础款未配置属性！");
+    		renderJson(new String[]{"errorMsg"});
+    		return;
+    	}
+
+    	Map<Integer, String> conflictType = new HashMap<Integer, String>();
+    	for (Record pt : propertyTypes) {
+    		if (!StringUtils.isEmpty(pt.getStr("conflict_type")))
+    			conflictType.put(Integer.valueOf(pt.get("property_type_id").toString()), pt.getStr("conflict_type"));
+    	}
+    	Record basePropertyType = propertyTypes.remove(0);
+    	if (!AppConstants.IS_BASE_YES.equals(basePropertyType.getStr("is_base"))) {
+    		setAttr("errorMsg", "复制源基础款未配置基本属性！");
+    		renderJson(new String[]{"errorMsg"});
+    		return;
+    	}
+    	
+    	int originalBaseType = basePropertyType.getInt("property_type_id");
+    	Map<Integer, Integer> originalCopy = new HashMap<Integer, Integer>();
+    	// 删除基础关联类别
+    	Db.update(ToolSqlXml.getSql("manage.prototype.deleteBaseType"), targetId);
+    	// 删除既有的原型的属性数据
+    	Db.update(ToolSqlXml.getSql("manage.prototype.deleteProperties"), targetId);
+    	// 复制基本属性类别
+    	Db.save("property_type", "property_type_id", basePropertyType.remove("property_type_id").set("prototype_id", targetId));
+    	originalCopy.put(originalBaseType, Integer.valueOf(basePropertyType.get("property_type_id").toString()));
+    	
+    	for (Record pt : propertyTypes) {
+    		
+    		int originalRelateType = pt.getInt("property_type_id");
+    		// 复制非基本属性类别
+    		Db.save("property_type", "property_type_id", pt.remove("property_type_id").set("prototype_id", targetId));
+    		
+    		Db.update(ToolSqlXml.getSql("manage.prototype.copyBaseRelateType"), basePropertyType.get("property_type_id"), pt.get("property_type_id"), originalBaseType, originalRelateType);
+    		originalCopy.put(originalRelateType, Integer.valueOf(pt.get("property_type_id").toString()));
+    	}
+    	// 更新冲突类别
+    	for (Integer ptId : conflictType.keySet()) {
+    		String[] cTypes = conflictType.get(ptId).split(",");
+    		StringBuilder copyCTypes = new StringBuilder();
+    		for (String type : cTypes) {
+    			copyCTypes.append(originalCopy.get(Integer.valueOf(type))).append(",");
+    		}
+    		Db.update("property_type", "property_type_id", new Record().set("property_type_id", originalCopy.get(ptId)).set(
+    				"conflict_type", copyCTypes.substring(0, copyCTypes.length()-1)));
+    	}
+		renderJson(new String[]{"errorMsg"});
+    }
+}

@@ -1,0 +1,225 @@
+<form id="typefm" method="post" novalidate >
+    
+    <div class="fitem">
+        <label>类别名称</label>
+        <input id="type_name" name="type_name" class="easyui-textbox" data-options="validType:'maxLength[20]'" value="${type.type_name!}">
+    </div>
+    <div class="fitem">
+        <label>类别名称（英文）</label>
+        <input id="type_name_ext" name="type_name_ext" class="easyui-textbox" data-options="validType:'maxLength[20]'" value="${type.type_name_ext!}">
+    </div>
+    <div class="fitem">
+        <label>原材料类别</label>
+        <select id="material_type_id" name="material_type_id" style="width:100px;" onchange="changeMType()">
+          <% for (mt in material_types) { %>
+              <option value="${mt.material_type_id}" extname="${mt.type_name_ext}" extype="${mt.exhibition_type}" ${type.material_type_id! == mt.material_type_id ? "selected='selected'" : ""}>${mt.type_name}</option>
+          <% } %>
+        </select>
+    </div>
+    
+  <div class="fitem">
+      <label>属性顺序</label>
+      <input id="property_rank" name="property_rank" class="easyui-textbox" value="${property_rank!}" />
+      <span style="color:red">* 设定任意前N个已选择的属性，描述格式为：【原材料id,原材料id】,例：2,1</span>
+  </div>
+  <div style="clear:both"></div>
+    <div>
+        <div class="float-left" style="width:130px"><label>原材料</label></div>
+        <div style="margin-bottom:5px">全选<input type="checkbox" name="allProperties" id="allProperties" onclick="checkAll(this)"></div>
+        <div style="margin-left: 120px;" id="materialDiv">
+            
+        </div>
+    </div>
+    <input type="hidden" name="cur_property_rank" value="${property_rank!}" id="cur_property_rank" />
+    <input type="hidden" name="cur_material_type_id" value="${type.material_type_id!}" id="cur_material_type_id" />
+    <input type="hidden" name="property_type_id" value="${type.property_type_id!}" id="property_type_id" />
+</form>
+
+<script type="text/javascript">
+
+  $(function(){
+     selectMaterials();
+  })
+
+  function checkAll(obj) {
+      $(":checkbox[name^='material_id_']").prop("checked", $(obj).is(":checked"));
+  }
+  
+  function selectProperty(obj) {
+      $("#allProperties").prop("checked", $(":checkbox[name^='material_id_']").toArray().every(function(item, index) {
+          return $(item).is(":checked");
+      }));
+  }
+  
+  function changeMType() {
+
+    var type = $("#material_type_id option:selected");
+    $("#type_name_ext").textbox('setValue', type.attr("extname"));
+    $("#type_name").textbox('setValue', type.text());
+    $("#allProperties").prop("checked", false);
+    selectMaterials();
+  }
+
+  function selectMaterials() {
+    
+    var type = $("#material_type_id option:selected");
+    $('#materialDiv').html('<table id="materialDg"></table>');
+    $('#materialDg').datagrid({
+        title:'',
+        iconCls:'icon-edit',
+        width:480,
+        height:550,
+        singleSelect:true,
+        idField:'material_id',
+        url:'${cxt!}/admin/property/getMaterialsByPtId/'+type.val()+'-${type.property_type_id!0}',
+        queryParams: {
+        },
+        onLoadSuccess: function() {
+
+            $("#allProperties").prop("checked", $(":checkbox[name^='material_id_']").toArray().every(function(item, index) {
+                if (!$(item).is(":checked")) {
+                    return false;
+                }
+                return true;
+            }));
+        },
+        columns:[[
+            {field:'is_checked',width:50,align:"center",formatter:function(value, row, index){
+                return "<input id='material_id_"+row.material_id+"' name='material_id_"+row.material_id+"' type='checkbox' onclick='selectProperty(this)' " + 
+                       ((value == "1") ? "checked='checked'" : "") + "value='" + row.material_id + "' />" +
+                       '<input type="hidden" name="property_id_'+row.material_id+'" value="'+(row.property_id || '')+'" />';
+            }},
+            {field:'material_id',title:'原材料id',width:100,align:"center"},
+            {field:'material_name',title:'名称',width:100},
+            {field:'material_exhibition',title:'原材料展示',width:150,align:"center",formatter:function(value, row, index){
+            	if (type.attr("extype") == "0") {
+                    // 颜色值展示
+                    return "<div class='box' style='background-color:"+value+";'></div>";
+            	} else {
+            		if (!value) value = "/default.jpg";
+                    value = value + "?t=" + new Date().getTime();
+                    return '<div style="float:left;padding:10px" class="pic"><img src="${imageUrl!}/'+ value +'" style="width:100px;" /></div>';
+            	}
+            }}
+        ]]
+    });
+  }
+
+  function save() {
+    // 更新类别
+    if ('${type.property_type_id!}') {
+    	confirmUpdatePropertyType();
+    } else {
+	    $('#typefm').form('submit',{
+	      url: '${cxt!}/admin/property/savePropertyType',
+	      onSubmit: function(){
+	          if (!$(this).form('validate')) return false;
+	          
+              var valid = checkUnselect();
+              if (!valid) {
+                  $.messager.alert('WARNING', '请至少选择一个属性！', "warning");
+                  return false;
+              }
+              valid = checkPropertyRank();
+              return valid;
+	      },
+	      success: function(result){
+	        var result = eval('('+result+')');
+	        if (result.errorMsg){
+	          $.messager.alert('Error', result.errorMsg);
+	        } else {
+	          $('#dlg').dialog('close');        // close the dialog
+	          $('#dg').datagrid('reload');  // reload the data
+	        }
+	      }
+	    });
+    }
+  }
+  
+  function confirmUpdatePropertyType() {
+
+      // form validate验证
+      if (!$('#typefm').form('validate')) return false;
+
+      var valid = true;
+      valid = checkUnselect();
+      if (!valid) {
+          $.messager.alert('WARNING', '请至少选择一个属性！', "warning");
+          return false;
+      }
+      if (!checkPropertyRank()) {
+          return false;
+      }
+      
+      var materialTypeId = $('#material_type_id').val();
+      var cur_material_type_id = $("#cur_material_type_id").val();
+      if (cur_material_type_id != materialTypeId) {
+          $.messager.confirm('更新属性','确认替换之前已关联的原材料类别吗?',function(r){
+            if (r) {
+            	updatePropertyType();
+            }
+          });
+      } else {
+        updatePropertyType();
+      }
+  }
+  
+  function checkUnselect() {
+      return $(":checkbox[name^='material_id_']").toArray().some(function(item, index) {
+                  return $(item).is(":checked");
+              });
+  }
+  
+  function updatePropertyType() {
+
+      checkUpdate(true, 'checkUpdateType/${type.property_type_id!}', ',仍然更新吗?', function(){
+          $('#typefm').form('submit',{
+            url: "${cxt!}/admin/property/updatePropertyType",
+            onSubmit: function(){
+            },
+            success: function(result){
+              var result = eval('('+result+')');
+              if (result.errorMsg){
+                $.messager.alert('Error', result.errorMsg, "error");
+              } else {
+                $('#dlg').dialog('close');        // close the dialog
+                $('#dg').datagrid('reload');  // reload the data
+                $.messager.alert('Info', "更新成功！", "info");
+              }
+            }
+          });
+      });
+  }
+  
+  function cancelPropertyRank() {
+      $('#editPropertyArea').show();
+      $('#rankPropertyArea').hide();
+      $('#property_rank').textbox('clear');
+  }
+  
+  function checkPropertyRank() {
+
+      var ranks = $("#property_rank").textbox('getValue');
+      var valid = true;
+      if (!ranks) return true;
+      var rankArr = ranks.split(/[\,,，]/);
+
+      var idRank = [];
+      valid = rankArr.every(function(rank){
+          if (!($("#material_id_"+rank) && $("#material_id_"+rank).is(":checked"))) {
+              $.messager.alert( 'warning', "属性标识【"+rank+"】的选项框未被选中！", "warning");
+              return false;
+          // 重复验证
+          } else if (idRank.indexOf(rank) > 0) {
+              $.messager.alert( 'warning', "属性标识【"+rank+"】被重复输入！", "warning");
+              return false;
+          }
+          idRank.push(rank);
+          return true;
+      });
+      if (valid) {
+          $("#property_rank").textbox('setValue', idRank.join(","));
+      }
+      return valid;
+  }
+</script>

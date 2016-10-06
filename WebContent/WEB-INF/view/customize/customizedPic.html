@@ -1,0 +1,104 @@
+<div class="sub-panel">
+    <div style="margin-bottom:5px">
+	    <span style="margin-left:20px">导入状态：</span>
+	    <select id="is_imported" class="easyui-combobox" name="is_imported" style="width:100px;" editable="false">
+	      <option value="">全部</option>
+	      <option value="0">未导入图片</option>
+	      <option value="1">已导入图片</option>
+	    </select>
+	    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-search" onclick="searchCustomizedPic()">检索</a>
+    </div>
+    <table id="customizedPic" title="" class="easyui-datagrid" style="width:930px;height:600px"
+        url="${cxt!}/admin/customize/listCustomizedPic/${prototype_id}"
+        toolbar="#toolbar" pagination="true"
+        rownumbers="false" singleSelect="true">
+        <thead>
+            <tr>
+                <th field="prototype_id" width="80" align="center">基础款id</th>
+                <th field="prototype_name" width="100" align="center">基础款名称</th>
+                <th field="property_key" width="430" formatter="formatProperty" align="center">定制属性</th>
+                <th field="custome_pic" width="200" formatter="formatCustomizedPic" align="center">定制图片</th>
+                <th field="action" width="100" formatter="customizedPicActions" align="center">操作</th>
+            </tr>
+        </thead>
+    </table>
+</div>
+<script type="text/javascript">
+
+	$(function() {
+	})
+	
+  function formatCustomizedPic(value, row, index) {
+      if (!value) value = "/default.jpg";
+      value = value + "?t=" + new Date().getTime();
+      return '<div style="padding:10px" class="pic"><img src="${imageUrl!}/'+ value +'" style="width:150px;height:auto" id="customization_img_'+index+'">'+
+      '<input type="file" class="pic" name="custome_pic_' + index + '" id="custome_pic_' + index +
+        '" contentEditable="false" accept="jpg/jpeg/gif" style="display:none" onchange="uploadFile(this)"/>'+
+            '<a class="c6" style="margin-left:10px" href="javascript:void(0)" onclick="changeImg(this)" id="btnChangePic_'+index+'">更换</a></div>'
+  }
+	
+	function customizedPicActions(value, row, index) {
+        return '<a class="c6" style="margin-left:10px" href="javascript:void(0)" onclick="uploadImg('+index+',\''+row.property_key+'\')">上传图片</a>';
+	}
+	function searchCustomizedPic() {
+		$('#customizedPic').datagrid("load", {
+			is_imported:$('#is_imported').combobox('getValue')
+		})
+	}
+    
+    var typeAndMaterial = eval(${typeAndMaterial});
+    function formatProperty(value, row, index) {
+        
+        var formatValue = '';
+        // 去掉两侧的下划线
+        var propertyKey = value.substr(1,value.length-2);
+        propertyKey = propertyKey.split(/_/);
+        propertyKey.forEach(function(value, index){
+            var typeAndPro = value.split(/@/);
+            typeAndPro = typeAndMaterial[typeAndPro[0]][typeAndPro[1]];
+            if (typeAndPro) {
+	            formatValue += '<div class="float-left" style="text-align:center;margin-left:5px"><div>' + typeAndPro["type_name"]+'</div>';
+	            // 颜色值
+	            if (typeAndPro["exhibition_type"] == "0") {
+	                formatValue += "<div class='box' style='background-color:"+typeAndPro["material_exhibition"]+"'></div></div>"
+	            } else {
+	                formatValue += "<img src='"+typeAndPro["material_exhibition"]+"' style='width:100px;' /></div>";
+	            }
+            } else {
+                formatValue += '<div class="float-left" style="text-align:center">印花相框</div>';
+            }
+            
+        });
+        
+        return '<div style="margin:10px">' + formatValue + '</div>';
+    }
+
+    function uploadImg(index, property_key) {
+        var inputFile = $("#custome_pic_"+index);
+        var upFile = inputFile[0].files[0];
+        if (upFile) {
+            var fd = new FormData();
+            fd.append( 'file', upFile);
+            $.ajax({
+                url: "${cxt!}/admin/customize/updateCustomizedPic/"+${prototype_id}+"-"+property_key+"-"+true,
+                data: fd,
+                processData: false,
+                contentType: false,
+                type: 'POST',
+                success: function(result){
+                  if (result.errorMsg){
+                    $.messager.alert('Error', result.errorMsg, 'error');
+                  } else {
+                    inputFile.prev().attr('src', "${imageUrl!}/" + result.custome_pic + "?t=" + new Date().getTime());
+                    inputFile.after(inputFile.clone().val(""));
+                    inputFile.remove();
+                    $.messager.alert('INFO', '上传成功！', 'info');
+                    
+                  }
+                }
+              });
+        } else {
+            $.messager.alert('WARNING', '请选择上传的图片！', "warning");
+        }
+    }
+</script>

@@ -1,0 +1,41 @@
+package com.goddess.ec.manage.interceptor;
+
+import org.apache.log4j.Logger;
+
+import com.goddess.ec.manage.controller.BaseController;
+import com.jfinal.aop.Interceptor;
+import com.jfinal.aop.Invocation;
+
+/**
+ * 权限认证拦截器
+ */
+public class AuthenticationInterceptor implements Interceptor {
+
+	private static Logger log = Logger.getLogger(AuthenticationInterceptor.class);
+
+	// TODO
+	@Override
+	public void intercept(Invocation ai) {
+		BaseController contro = (BaseController) ai.getController();
+
+		log.info("获取reqSysLog!");
+//		Syslog reqSysLog = contro.getAttr(GlobalHandler.reqSysLogKey);
+//		contro.setReqSysLog(reqSysLog);
+
+//
+//        try {
+//            ai.invoke();
+//        } catch (Exception e) {
+//            log.info("业务逻辑代码遇到异常时保存日志!");
+//            reqSysLog.set("status", "0");// 失败
+//            reqSysLog.set("description", e.getMessage());
+//            reqSysLog.set("cause", "3");// 业务代码异常
+//
+//            // TODO 失败的时候,返回错误状态值
+//
+//        } finally {
+//
+//        }
+	}
+
+}

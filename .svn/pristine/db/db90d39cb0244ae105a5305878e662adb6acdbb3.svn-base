@@ -1,0 +1,120 @@
+package com.goddess.ec.manage.controller;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.log4j.Logger;
+
+import com.alibaba.druid.support.json.JSONUtils;
+import com.goddess.ec.manage.annotation.Controller;
+import com.goddess.ec.manage.common.SplitPage;
+import com.goddess.ec.manage.service.CommodityService;
+import com.goddess.ec.manage.service.OrderService;
+import com.goddess.ec.manage.service.WxService;
+import com.jfinal.aop.Before;
+import com.jfinal.plugin.activerecord.Record;
+import com.jfinal.plugin.activerecord.tx.Tx;
+
+/**
+ * 退货订单
+ */
+@Controller(controllerKey = "/admin/returnOrder")
+public class ReturnOrderController extends BaseController {
+
+    @SuppressWarnings("unused")
+    private static Logger log = Logger.getLogger(ReturnOrderController.class);
+
+    /**
+     * 订单列表
+     */
+    public void index() {
+    	
+    	render("/order/orderList.html");
+    }
+    
+    public void searchOrders() {
+        SplitPage sp = new SplitPage();
+        // 检索页基本设定
+        sp.setPageNumber(getParaToInt("page"));
+        sp.setPageSize(getParaToInt("rows"));
+        sp.setOrderColunm(getPara("sort"));
+        sp.setOrderMode(getPara("order"));
+
+        // 检索条件
+        Map<String, String> queryParam = new HashMap<String, String>();
+        // 订单内部状态
+        queryParam.put("internal_order_status", getPara("internal_order_status"));
+        queryParam.put("cell_num", getPara("cell_num"));
+        queryParam.put("order_id", getPara("order_id"));
+        String orderDateFrom = getPara("order_date_from");
+        String orderDateTo = getPara("order_date_to");
+        if (StringUtils.isNotBlank(orderDateFrom))
+        	queryParam.put("order_date_from", orderDateFrom + " 00:00:00");
+        if (StringUtils.isNotBlank(orderDateTo))
+        	queryParam.put("order_date_to", orderDateTo+" 23:59:59");
+        
+        // 条件设定
+        sp.setQueryParam(queryParam);
+
+        // 检索处理
+        OrderService.service.getOrders(sp);
+
+        Map<String, Object> jsonRes = new HashMap<String, Object>();
+        jsonRes.put("total",  sp.getPage().getTotalRow());
+        jsonRes.put("rows",  sp.getPage().getList());
+        
+        renderJson(jsonRes);
+    }
+    
+    public void getOrderCommodities() {
+    	
+    	String orderId = getPara(0);
+    	
+    	List<Record> orderComm = OrderService.service.getOrderCommodities(orderId);
+    	for (Record r : orderComm) {
+        	Map<String, Object> baseProperties = (Map<String, Object>)JSONUtils.parse(String.format("{%s}", 
+        			r.getStr("base_properties") == null ? "" : r.getStr("base_properties")));
+        	r.set("base_properties", baseProperties);
+        	// 定制属性
+        	List<Record> customizePros = CommodityService.service.getCommodityCustomizationProps(r.getInt("user_customization_id"), r.getInt("commodity_id"));
+    		// 非定制上架商品的材料属性描述
+    		if ((customizePros == null || customizePros.size() == 0) && StringUtils.isNotEmpty(r.getStr("detail_properties"))) {
+    	    	Map<String, Object> detailProperties = (Map<String, Object>)JSONUtils.parse(String.format("{%s}", r.getStr("detail_properties")));
+    	    	for (String tp : detailProperties.keySet())
+    	    		customizePros.add(new Record().set("type_name", tp).set("material_name", detailProperties.get(tp)));
+    		}
+    		r.set("customize_properties", customizePros);
+    	}
+
+    	setAttr("order_commodities", orderComm);
+    	render("/order/orderCommodities.html");
+    }
+    
+    /**
+     * 退货后的订单退款（/returnOrder/refund/{return_order_id}）
+     * 
+     * @throws Exception
+     */
+    @Before(Tx.class)
+    public void refund() throws Exception {
+    	
+    	String errMsg = WxService.service.returnRefund(getPara(0));
+    	setAttr("errorMsg", errMsg);
+    	renderJson(new String[]{"errorMsg"});
+    }
+
+    /**
+     * TODO 退货后的订金退款（/returnOrder/refund/{return_order_id}）
+     * 
+     * @throws Exception
+     */
+    @Before(Tx.class)
+    public void DepositRefund() throws Exception {
+    	
+    	String errMsg = WxService.service.returnDepositRefund(getPara(0));
+    	setAttr("errorMsg", errMsg);
+    	renderJson(new String[]{"errorMsg"});
+    }
+}

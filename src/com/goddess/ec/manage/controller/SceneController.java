@@ -1,0 +1,196 @@
+package com.goddess.ec.manage.controller;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.lang3.StringUtils;
+
+import com.goddess.ec.manage.annotation.Controller;
+import com.goddess.ec.manage.constants.AppConstants;
+import com.goddess.ec.manage.data.ScenePage;
+import com.goddess.ec.manage.model.Scene;
+import com.goddess.ec.manage.service.SceneService;
+import com.goddess.ec.manage.tools.ToolSqlXml;
+import com.goddess.ec.manage.tools.ToolUtils;
+import com.jfinal.aop.Before;
+import com.jfinal.plugin.activerecord.Db;
+import com.jfinal.plugin.activerecord.tx.Tx;
+import com.jfinal.upload.UploadFile;
+
+@Controller(controllerKey = "/admin/scene")
+public class SceneController extends BaseController {
+
+	public void index() {
+		setAttr("scene_tree", SceneService.sceneTree.get("scene")).render("/scene/sceneList.html");
+	}
+	
+	public void sceneTree() {
+		//System.out.println(SceneService.treeJson);
+    	renderJson(SceneService.treeJson);
+	}
+	
+	public void initScene() {
+
+		String destination = getPara(3);
+    	setAttr("scene", new Scene().set("terminal", getPara(0)).set("page", getPara(1)).set("location", getPara(2))).setAttr(
+				"destination", destination).setAttr(
+    			"dest_editable", true).setAttr(
+    			"destination_text", StringUtils.isEmpty(destination) ? null : ScenePage.getEnumByCode(destination).getText()).render("/scene/sceneDetail.html");
+	}
+	
+	public void getSceneById() {
+		Scene s = Scene.dao.findById(getPara(0));
+    	setAttr("scene", s).setAttr(
+				"destination", s.getStr("destination")).setAttr(
+    			"dest_editable", true).setAttr(
+    			"destination_text", ScenePage.getEnumByCode(s.getStr("destination")).getText()).render("/scene/sceneDetail.html");
+	}
+	
+	public void getSceneByCode() {
+
+		String destination = getPara(3);
+    	Map<String, Object> params = new HashMap<String, Object>();
+    	params.put("terminal", getPara(0));
+    	params.put("page", getPara(1));
+    	params.put("location", getPara(2));
+    	params.put("rank", getPara(4));
+    	
+    	List<Scene> scenes = SceneService.service.getScenes(params);
+    	Scene s = null;
+    	if (scenes.size() != 0)
+    		s = scenes.get(0);
+    	else
+    		s = new Scene().set("terminal", getPara(0)).set("page", getPara(1)).set("location", getPara(2)).set("destination", destination);
+    	setAttr("scene", s).setAttr(
+				"destination", destination).setAttr(
+    			"dest_editable", StringUtils.isEmpty(destination)).setAttr(
+    			"destination_text", StringUtils.isEmpty(destination) ? null : ScenePage.getEnumByCode(destination).getText())
+    			.render("/scene/sceneDetail.html");
+	}
+	
+	/**
+	 * 取得该位置所有场景
+	 */
+    public void getScenes() {
+
+    	Map<String, Object> params = new HashMap<String, Object>();
+    	params.put("terminal", getPara(0));
+    	params.put("page", getPara(1));
+    	params.put("location", getPara(2));
+    	renderJson(SceneService.service.getScenes(params));
+    }
+    
+    /**
+     * 取得场景关联的商品
+     */
+    public void getRelatedCommodities() {
+
+    	Integer sceneId = getParaToInt(0, 0);
+    	renderJson(SceneService.service.getRelatedCommodities(sceneId, getParaToInt(1, 0)));
+    }
+    
+    /**
+     * 取得场景关联的品牌
+     */
+    public void getRelatedBrands() {
+    	renderJson(SceneService.service.getRelatedBrands());
+    }
+    
+    public void updateRelatedCommodities() {
+    	if (!Scene.dao.findById(getParaToInt("scene_id")).set("scene_commodities", getPara("scene_commodities")).update())
+    		setAttr("errorMsg", "关联商品失败！");
+    	renderJson(new String[]{"errorMsg"});
+    }
+    
+    /**
+     * 保存场景
+     */
+    @Before(Tx.class)
+    public void saveScene() {
+
+    	UploadFile f = getFile();
+    	Scene s = new Scene();
+    	String sceneCommodities = getPara("scene_commodities");
+//    	ScenePage sp = ScenePage.getEnumByCode(getPara("destination"));
+    	
+    	createScene(s);
+    	s.save();
+    	Scene newS = Scene.dao.findById(s.getInt("scene_id"));
+		if (f != null) {
+			try {
+				String saveURL = ToolUtils.saveUploadFile(f, AppConstants.RELATIVE_PATH_SCENE, s.getInt("scene_id").toString(), ToolUtils.getExtension(f.getOriginalFileName()));
+				newS.set("scene_pic", saveURL);
+			} catch (IOException e) {
+	    		setAttr("errorMsg", "上传文件存储失败！");
+				e.printStackTrace();
+			}
+		} else if (AppConstants.DELETE_FLAG_INVALID.equals(getPara("scene_pic_delete"))) {
+			newS.set("scene_pic", null);
+		}
+		// TODO 
+//		newS.set("scene_url", sp.getSceneUrl(s.getInt("scene_id"), commodityId));
+//		newS.set("route_url", sp.getRouteUrl(s.getInt("scene_id"), relatedId));
+		newS.update();
+		// 保存至场景商品列表scene_commodities
+		if (StringUtils.isNotEmpty(sceneCommodities)) {
+			SceneService.service.saveSceneCommodities(sceneCommodities.split("_"), newS.getInt("scene_id"));
+		}
+    	renderJson(new String[]{"errorMsg"});
+    }
+    
+    private void createScene(Scene s) {
+
+    	s.set("scene_name", getPara("scene_name")).set(
+    				"scene_name_ext", getPara("scene_name_ext")).set(
+					"related_id", getParaToInt("related_id")).set(
+    				"rank", getParaToInt("rank", 1)).set(
+					"terminal", getPara("terminal")).set(
+					"page", getPara("page")).set(
+					"location", getPara("location")).set(
+					"destination", getPara("destination"));
+    	if ("4".equals(getPara("destination"))) {
+    		s.set("route_url", getPara("route_url"));
+    	}
+    }
+    
+    /**
+     * 更新场景
+     */
+    @Before(Tx.class)
+    public void updateScene() {
+
+    	UploadFile f = getFile();
+		Scene s = Scene.dao.findById(getPara("scene_id"));
+    	String sceneCommodities = getPara("scene_commodities");
+    	createScene(s);
+		if (f != null) {
+			try {
+    		    s.set("scene_pic", ToolUtils.saveUploadFile(f, AppConstants.RELATIVE_PATH_SCENE, getPara("scene_id"), ToolUtils.getExtension(f.getOriginalFileName())));
+	    	} catch (IOException e) {
+	    		setAttr("errorMsg", "上传文件存储失败！");
+	    		e.printStackTrace();
+	    	}
+		} else if (AppConstants.DELETE_FLAG_INVALID.equals(getPara("scene_pic_delete"))) {
+			s.set("scene_pic", null);
+		}
+		s.update();
+		// 删除原有的场景商品
+		SceneService.service.deleteSceneCommodities(s.getInt("scene_id"));
+		if (StringUtils.isNotEmpty(sceneCommodities)) {
+			// 添加新的场景商品
+			SceneService.service.saveSceneCommodities(sceneCommodities.split("_"), s.getInt("scene_id"));
+		}
+    	renderJson(new String[]{"errorMsg"});
+    }
+    
+    /**
+     * 删除场景
+     */
+    public void deleteScene() {
+    	Scene.dao.deleteById(getPara(0));
+    	Db.update(ToolSqlXml.getSql("manage.scene.deleteSceneComm"), getPara(0));
+    	renderJson(new String[]{"errorMsg"});
+    }
+}

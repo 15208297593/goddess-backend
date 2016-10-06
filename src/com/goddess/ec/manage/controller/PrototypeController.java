@@ -1,0 +1,386 @@
+package com.goddess.ec.manage.controller;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.log4j.Logger;
+
+import com.goddess.ec.manage.annotation.Controller;
+import com.goddess.ec.manage.common.SplitPage;
+import com.goddess.ec.manage.constants.AppConstants;
+import com.goddess.ec.manage.model.CategoryType;
+import com.goddess.ec.manage.model.Prototype;
+import com.goddess.ec.manage.model.PrototypePic;
+import com.goddess.ec.manage.service.BrandService;
+import com.goddess.ec.manage.service.CustomizeService;
+import com.goddess.ec.manage.service.PrototypeService;
+import com.goddess.ec.manage.tools.ToolSqlXml;
+import com.goddess.ec.manage.tools.ToolUtils;
+import com.goddess.ec.manage.tools.ToolWeb;
+import com.jfinal.aop.Before;
+import com.jfinal.kit.JsonKit;
+import com.jfinal.plugin.activerecord.Db;
+import com.jfinal.plugin.activerecord.Record;
+import com.jfinal.plugin.activerecord.tx.Tx;
+import com.jfinal.upload.UploadFile;
+
+/**
+ * 原型管理
+ */
+@Controller(controllerKey = "/admin/prototype")
+public class PrototypeController extends BaseController {
+
+    @SuppressWarnings("unused")
+    private static Logger log = Logger.getLogger(PrototypeController.class);
+
+    public void index() {
+    	render("/prototype/prototypeList.html");
+    }
+    
+    public void getPrototype() {
+
+    	int prototypeId = getParaToInt(0);
+    	Prototype p = Prototype.dao.findById(prototypeId);
+
+    	List<Record> prototypeAccessory = PrototypeService.service.getPrototypeAccessory(prototypeId);
+    	List<Record> slots = new ArrayList<Record>();
+    	for (Record r : prototypeAccessory) {
+    		String type = r.getStr("accessory_type");
+    		if (AppConstants.ACCESSORY_SLOT.equals(type)) {
+    			slots.add(r);
+    		}
+    	}
+    	
+    	List<Record> prototypePics = PrototypeService.service.getPrototypePics(prototypeId);
+    	List<Record> prototypePicCarousel = new ArrayList<Record>();
+    	int maxRank = 0;
+    	for (Record r : prototypePics) {
+    		String picType = r.getStr("pic_type");
+    		if (AppConstants.PROTOTYPE_PIC_TYPE_CAROUSEL.equals(picType)) {
+    			prototypePicCarousel.add(r);
+    			maxRank = r.getInt("rank");
+    		}
+    	}
+    	setAttr("pic_carousel", prototypePicCarousel);
+    	setAttr("pic_carousel_max", maxRank);
+    	
+    	setAttr("slots", slots);
+    	setAttr("logos", getLogoPrints(prototypeId));
+    	setAttr("p", p);
+    	// 品牌
+    	setAttr("brands", BrandService.service.getAll());
+
+//    	Map<Integer, Map<Integer, Record>> typeAndMaterial = CustomizeService.service.getMaterialCombination();
+//    	setAttr("types", PrototypeService.service.getMaterialTypes());
+//    	setAttr("typeAndMaterial", JsonKit.toJson(typeAndMaterial));
+
+    	render("/prototype/prototypeDetail.html");
+    }
+    
+    private List<Record> getLogoPrints(int prototypeId) {
+
+    	List<Record> logoPrints = Db.find(ToolSqlXml.getSql("manage.logoPrint.getPrototypeLogoPrint"), prototypeId);
+    	for (Record lp : logoPrints) {
+			String[] allIds = lp.getStr("all_id").split(",");
+			String[] allNames = lp.getStr("all_name").split(",");
+			String[] allPrices = lp.getStr("all_price").split(",");
+			String[] allPics = lp.getStr("all_pic").split(",");
+			String[] allSelected = lp.getStr("all_selected").split(",");
+			lp.remove("all_id", "all_name", "all_price", "all_pic");
+			List<Record> allLogos = new ArrayList<Record>();
+			for (int i = 0; i < allIds.length; i++) {
+				Record logo = new Record();
+				logo.set("id", allIds[i]);
+				logo.set("name", allNames[i]);
+				logo.set("price", allPrices[i]);
+				logo.set("pic", allPics[i]);
+				logo.set("selected", "1".equals(allSelected[i]));
+				allLogos.add(logo);
+			}
+			lp.set("all_logos", allLogos);
+		}
+    	
+    	return logoPrints;
+    }
+    
+    public void getClassificationTree() {
+
+    	List<Record> nodes = Db.find(ToolSqlXml.getSql("manage.prototype.getPrototypeClassification"), getParaToInt(0));
+    	Map<Integer, Record> classificationTree = new HashMap<Integer, Record>();
+
+    	Map<String, Record> categories = new HashMap<String, Record>();
+    	List<Record> rootTree = new ArrayList<Record>();
+    	for (Record r : nodes) {
+    		Integer parentId = r.getInt("parent_id");
+
+    		classificationTree.put(r.getInt("id"), r);
+    		if (parentId != 0) {
+
+    			Record node = classificationTree.get(parentId);
+    			List<Record> children = node.get("children");
+    			if (children == null) {
+    				children = new ArrayList<Record>();
+    				node.set("children", children);
+    			}
+    			children.add(r.set("checked", r.get("prototype_id") == null ? false : true).set("value", node.get("value")+"_"+r.get("id")));
+    		// 1级结点，父结点为0
+    		} else {
+    			Record category =categories.get(r.getStr("category"));
+    			if (category == null) {
+        			List<Record> children = new ArrayList<Record>();
+        			String cType = r.getStr("category");
+        			CategoryType ct = CategoryType.getEnumByCode(cType);
+    				category = new Record().set("children", children).set("text", ct.getText()).set("id", ct.getId()).set("value", ct.getCode());
+    				categories.put(r.getStr("category"), category);
+    				
+    				rootTree.add(category);
+    			}
+    			List<Record> children = category.get("children");
+    			children.add(r.set("checked", r.get("prototype_id") == null ? false : true).set("value", category.get("value")+"_"+r.get("id")));
+    		}
+    	}
+    	renderJson(rootTree);
+    }
+
+    public void initPrototype() {
+
+    	List<Record> prototypeAccessory = PrototypeService.service.getPrototypeAccessory(0);
+    	List<Record> carousel = new ArrayList<Record>();
+    	List<Record> slots = new ArrayList<Record>();
+    	for (Record r : prototypeAccessory) {
+    		String type = r.getStr("accessory_type");
+    		if (AppConstants.ACCESSORY_SLOT.equals(type)) {
+    			slots.add(r);
+    		}
+    	}
+    	
+    	setAttr("slots", slots);
+    	setAttr("logos", getLogoPrints(0));
+    	setAttr("pic_carousel", carousel);
+    	setAttr("typeAndMaterial", JsonKit.toJson(CustomizeService.service.getMaterialCombination()));
+    	setAttr("types", PrototypeService.service.getMaterialTypes());
+    	setAttr("p", new Prototype());
+    	setAttr("category", AppConstants.CATEGORY_BAG);
+    	// 品牌
+    	setAttr("brands", BrandService.service.getAll());
+
+    	render("/prototype/prototypeDetail.html");
+    }
+    
+    /**
+     * 原型类别列表
+     */
+    public void listPrototypes() {
+        SplitPage sp = new SplitPage();
+        // 检索条件设定
+        sp.setPageNumber(getParaToInt("page"));
+        sp.setPageSize(getParaToInt("rows"));
+        sp.setOrderColunm(getPara("sort"));
+        sp.setOrderMode(getPara("order"));
+        
+        Map<String, String> params = new HashMap<String, String>();
+        sp.setQueryParam(params);
+
+        PrototypeService.service.getPrototypes(sp);
+
+        Map<String, Object> jsonRes = new HashMap<String, Object>();
+		jsonRes.put("total",  sp.getPage().getTotalRow());
+		jsonRes.put("rows",  sp.getPage().getList());
+        renderJson(jsonRes);
+    }
+    
+    /**
+     * 添加新原型
+     */
+    @Before(Tx.class)
+    public void savePrototype() {
+    	
+    	List<UploadFile> upFiles = getFiles();
+    	Prototype p = createPrototype();
+    	// 保存新类别
+    	if (!p.save()) {
+    		setAttr("errorMsg", "原型添加失败！");
+    	} else {
+    		try {
+    			// 保存原型的属性类型
+//    			savePropertyTypes();
+    			
+    			if (upFiles != null && upFiles.size() != 0) {
+    				p = new Prototype().set("prototype_id", p.getInt("prototype_id"));
+    				uploadFile(p, upFiles);
+    				Prototype.dao.findById(p.getInt("prototype_id")).setAttrs(p).update();
+    			}
+    			
+    			updatePrototypeAcc(p.getInt("prototype_id"));
+    			updatePrototypeClassification(p.getInt("prototype_id"), p.getInt("brand_id"), getPara("category"));
+    		} catch (IOException e) {
+    			e.printStackTrace();
+    			setAttr("errorMsg", "上传文件存储失败!");
+    		}
+    		setAttr("prototype",p);
+    	}
+    	renderJson(new String[]{"errorMsg", "prototype"});
+    }
+    
+    /**
+     * 更新配饰
+     */
+    private void updatePrototypeAcc(int prototypeId) {
+
+		Map<String, String> params = ToolWeb.getParamMap(getRequest());
+		// 删除现有的
+		Db.update(ToolSqlXml.getSql("manage.accessory.deletePrototypeAccByType"), prototypeId);
+//		Db.update(ToolSqlXml.getSql("manage.logoPrint.deletePrototypeLogoPrint"), prototypeId);
+		for(String key : params.keySet()) {
+			// 添加新的配饰
+			if (key.startsWith("prototype_accessory_")) {
+				Db.save("commodity_accessory", "accessory_id", new Record().set("accessory_id", params.get(key)).set(
+											"prototype_id", prototypeId));
+			} else if (key.startsWith("logo_print_")) {
+				Db.save("commodity_accessory", "logo_print_id", new Record().set("logo_print_id", params.get(key)).set(
+						"prototype_id", prototypeId));
+			} 
+		}
+    }
+    
+    /**
+     * 更新类别
+     * @param prototypeId
+     * @param brandId
+     * @param category
+     */
+    private void updatePrototypeClassification(Integer prototypeId, Integer brandId, String category) {
+		
+		Set<String> allClassifications = new HashSet<String>();
+		String[] classifications = getPara("classification").split(",");
+		// 删除原有的类别id
+		Db.update(ToolSqlXml.getSql("manage.prototype.deleteClassificationByPrototype"), prototypeId);
+		// 添加新的类别id
+		for (String cid : classifications) {
+			String[] ids = cid.split("_");
+			for (int i = 1; i< ids.length; i++) {
+    			if (allClassifications.contains(ids[i])) continue;
+    			allClassifications.add(ids[i]);
+    			Db.update(ToolSqlXml.getSql("manage.prototype.addPrototypeClassification"), prototypeId, Integer.valueOf(ids[i]), brandId, ids[0]);
+			}
+		}
+    }
+
+    private void uploadFile(Prototype p, List<UploadFile> upFiles) throws IOException {
+
+		int prototypeId = p.getInt("prototype_id");
+		for (UploadFile f : upFiles) {
+			String picType = f.getParameterName();
+			
+			// 基础款图片
+			if (picType.equals("prototype_pic_file")) {
+
+				String saveURL = ToolUtils.saveUploadFile(f, AppConstants.RELATIVE_PATH_PROTOTYPE + prototypeId, 
+						f.getParameterName(), ToolUtils.getExtension(f.getOriginalFileName()));
+				p.set(picType.replace("_file", ""), saveURL);
+			// 轮播图
+			} else if (picType.startsWith("prototype_carousel_")) {
+				String rank = picType.substring(picType.lastIndexOf("_")+1);
+				String saveURL = ToolUtils.saveUploadFile(f, AppConstants.RELATIVE_PATH_PROTOTYPE + prototypeId, 
+						"prototype_pic_"+rank, ToolUtils.getExtension(f.getOriginalFileName()));
+				new PrototypePic().set("prototype_id", p.getInt("prototype_id")).set(
+									"pic_type", AppConstants.PROTOTYPE_PIC_TYPE_CAROUSEL).set(
+									"rank", Integer.valueOf(rank)).set(
+									"pic_url", saveURL).save();
+			} else {
+			}
+		}
+		// 删除轮播图
+		Map<String, String> params = ToolWeb.getParamMap(getRequest());
+		for (String key : params.keySet()) {
+			if (key.startsWith("delete_prototype_pic_") && AppConstants.DELETE_FLAG_INVALID.equals(params.get(key))) {
+				PrototypePic.dao.deleteById(key.replace("delete_prototype_pic_", ""));
+			}
+		}
+    }
+    
+    private Prototype createPrototype() {
+
+    	return new Prototype().set(
+				"prototype_name", getPara("prototype_name")).set(
+				"base_properties", getPara("base_properties")).set(
+				"prototype_des", getPara("prototype_des")).set(
+				"print_frame", getPara("print_frame")).set(
+				"base_price", getParaToInt("base_price")).set(
+				"print_price", getParaToInt("print_price")).set(
+				"brand_id", getParaToInt("brand_id")).set(
+				"delete_flag", AppConstants.DELETE_FLAG_VALID);
+    }
+    
+    /**
+     * 验证是否可更新原型，用户定制中是否有尚未付款的记录{prototype_id}
+     */
+    public void checkUpdatePrototype() {
+    	checkUpdate("checkPrototypeIsUsed", getPara(0), "该基础款");
+    }
+    
+    /**
+     * 验证是否可更新属性类别，用户定制中是否有尚未付款的记录{property_type_id}
+     */
+    public void checkUpdateType() {
+    	checkUpdate("checkTypeIsUsed", getPara(0), "该属性类别");
+    }
+
+    /**
+     * 验证是否可删除属性，用户定制中是否有尚未付款的记录{property_type_id}
+     */
+    public void checkUpdateProperties() {
+    	String deletedProperties = StringUtils.join(getPara(0).split("_"), ",");
+    	checkUpdate("checkPropertyIsUsed", deletedProperties, "该类别下的某些属性【"+StringUtils.join(getPara(1).split("_"), ",")+"】");
+    }
+    
+    private void checkUpdate(String sqlId, String ids, String msg) {
+    	Record res = Db.findFirst(ToolSqlXml.getSql("manage.prototype."+sqlId), AppConstants.CUSTOMIZE_STATUS_UNFINISHED, ids);
+		if (res != null && StringUtils.isNotEmpty(res.getStr("cell_num")))
+			setAttr("errorMsg", String.format("%s正在被用户【%s】用于未完成的定制中", msg, res.getStr("cell_num")));
+    	renderJson(new String[]{"errorMsg"});
+    }
+    
+    /**
+     * 更新原型
+     */
+    @Before(Tx.class)
+    public void updatePrototype() {
+
+    	List<UploadFile> upFiles = getFiles();
+    	Prototype p = createPrototype();
+    	int prototypeId = getParaToInt("prototype_id");
+    	Integer brandId = getParaToInt("brand_id");
+    	String category = getPara("category");
+    	p.set("prototype_id", prototypeId);
+		try {
+			if (upFiles != null && upFiles.size() != 0) {
+				uploadFile(p, upFiles);
+			}
+			updatePrototypeAcc(prototypeId);
+			updatePrototypeClassification(prototypeId, brandId, category);
+	    	
+		} catch (IOException e) {
+			e.printStackTrace();
+			setAttr("errorMsg", "上传文件存储失败");
+		}
+		Prototype.dao.findById(prototypeId).setAttrs(p).update();
+		setAttr("prototype",p);
+    	renderJson(new String[]{"errorMsg", "prototype"});
+    }
+    
+    /**
+     * 删除原型
+     */
+    public void deletePrototype() {
+    	if (!Prototype.dao.findById(getPara(0)).set("delete_flag", AppConstants.DELETE_FLAG_INVALID).update())
+    		setAttr("errorMsg", "删除失败");
+    	renderJson(new String[]{"errorMsg"});
+    }
+}

@@ -1,0 +1,299 @@
+<div class="sub-panel">
+    <div style="text-align:right;margin-top:10px">
+        <% if(isEmpty(property_type.property_type_id)) { %>
+            <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-add" onclick="addProperties(this)">添加属性</a>
+        <% } else { %>
+            <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-edit" onclick="confirmUpdateProperties()">更新属性</a>
+        <% }%>
+    </div>
+    <div>
+        <div class="fitem for_update_input">
+            <label>类别id</label>${property_type.property_type_id!}
+        </div>
+        <div class="fitem for_update_input">
+            <label>类别名称</label>
+            <input id="type_name" name="type_name" value="${property_type.type_name}" class="easyui-textbox" required="true" data-options="validType:'maxLength[16]'">
+        </div>
+        <div class="fitem for_update_input">
+            <label>类别名称（英文）</label>
+            <input id="type_name_ext" name="type_name_ext" value="${property_type.type_name_ext}" class="easyui-textbox" required="true" data-options="validType:'maxLength[16]'">
+        </div>
+        <div class="fitem">
+            <label>父属性类别</label>
+         <select id="parent_type_id" class="easyui-combobox" name="parent_type_id" style="width:100px;" editable="false">
+               <option value="">无</option>
+           <% for (ft in parent_types) { %>
+               <option value="${ft.property_type_id}" ${property_type.parent_type_id! == ft.property_type_id ? "selected='selected'" : ""}>${ft.type_name}</option>
+           <% } %>
+         </select>
+        </div>
+        <div class="fitem">
+            <label>原材料类别</label>
+            <select id="material_type_id" class="easyui-combobox" name="material_type_id" style="width:100px;" editable="false" data-options="onSelect:changeMType">
+                  <option value="">无</option>
+              <% for (mt in material_types) { %>
+                  <option value="${mt.material_type_id}" ${property_type.material_type_id! == mt.material_type_id ? "selected='selected'" : ""}>${mt.type_name}</option>
+              <% } %>
+            </select>
+        </div>
+        <div class="fitem for_update_input">
+            <label>原材料用量</label>
+            <input id="material_amount" name="material_amount" value="${property_type.material_amount!100}" class="easyui-textbox" required="true" data-options="validType:'integer'">%
+        </div>
+        <div class="fitem type_rank">
+            <label>显示顺序</label>
+            <input id="type_rank" name="type_rank" value="${property_type.rank}" prompt="0~100" class="easyui-textbox" data-options="validType:'range[0,100]'">
+          <span style="color:red">* 0~100,数值越高越靠前，默认为0;子属性类别不能设置</span>
+        </div>
+    </div>
+    <hr/>
+    <div style="clear:both;margin-bottom:5px"></div>
+       
+	<input type="hidden" name="pt_type" value="${pt_type!}" id="pt_type" />
+	<input type="hidden" name="cur_material_type_id" value="${property_type.material_type_id!}" id="cur_material_type_id" />
+	<input type="hidden" name="property_type_id" value="${property_type.property_type_id!}" id="property_type_id" />
+    <input type="hidden" name="prototype_id" id="prototype_id" value="${property_type.prototype_id}"/>
+</div>
+<script type="text/javascript">
+
+	function changeMType(rec) {
+
+        var southPanel = $('#prototypeLayout').layout('panel', 'south');
+        if (southPanel && southPanel.length > 0) {
+            southPanel.panel('clear');
+        }
+        if (!rec.value) {
+        	return false;
+        }
+        
+        var cur_material_type_id = $("#cur_material_type_id").val();
+        var ptid = 0;
+        // 编辑原有属性类别，并且是之前的原材料类别
+        if (cur_material_type_id && cur_material_type_id == rec.value) ptid = ${property_type.property_type_id!0};
+        var href = "${cxt!}/admin/prototype/getMaterialsAndType/"+rec.value+'-'+ptid+'-'+${property_type.prototype_id};
+        if (southPanel && southPanel.length > 0) {
+            southPanel.panel({title:'', href:href});
+        } else {
+            $('#prototypeLayout').layout('add',{
+                region: 'south',
+                height: 500,
+                title:'',
+                collapsible:false,
+                border: false,
+                href:href
+            });
+        }
+	}
+	
+	function require(obj) {
+		//if (!$(obj).is(":checked")) $("#default_material_id").textbox('setValue', '');
+	}
+    function checkAll(obj) {
+    	$(":checkbox[name^='material_id_']").prop("checked", $(obj).is(":checked"));
+    }
+    
+    function selectProperty(obj) {
+    	$("#allProperties").prop("checked", $(":checkbox[name^='material_id_']").toArray().every(function(item, index) {
+   			return $(item).is(":checked");
+    	}));
+    }
+    
+    function checkUnselect() {
+    	return $(":checkbox[name^='material_id_']").toArray().some(function(item, index) {
+	                return $(item).is(":checked");
+		        });
+    }
+    
+    function addProperties(obj) {
+
+        $('#propertyForm').form('submit',{
+          url: "${cxt!}/admin/prototype/saveProperties",
+          onSubmit: function(){
+        	// validate验证
+            if (!$('#propertyForm').form('validate')) return false;
+        	if ($('#parent_type_id').combobox('getValue') && !$('#material_type_id').combobox('getValue')) {
+	            $.messager.alert('WARNING', '选择了父类别的子类别必须选择原材料类别！', "warning");
+        		return false;
+        	// 选择了原材料类别
+        	} else if ($('#material_type_id').combobox('getValue')) {
+	            var valid = checkUnselect();
+		        if (!valid) {
+		            $.messager.alert('WARNING', '请至少选择一个属性！', "warning");
+		            return false;
+		        }
+
+		        if (!checkTypeRank()) return false;
+	        	// check property rank
+                var ranks = $("#property_rank").textbox('getValue');
+	        	if (!ranks) return valid;
+                var rankArr = ranks.split(/[\,,，]/);
+
+                var idRank = [];
+                valid = rankArr.every(function(rank){
+                    if (!$(":checkbox[name='material_id_"+rank+"']").is(":checked")) {
+                        $.messager.alert( 'warning', "属性标识【"+rank+"】的选项框未选中！", "warning");
+                        return false;
+                    // 重复验证
+                    } else if (idRank.indexOf(rank) > 0) {
+                        $.messager.alert( 'warning', "属性标识【"+rank+"】被重复输入！", "warning");
+                        return false;
+                    }
+                    idRank.push(rank);
+                    return true;
+                });
+	            if (valid) {
+	            	$("#property_rank").textbox('setValue', idRank.join(","));
+	            	$(obj).linkbutton("disable");
+	            }
+	            return valid;
+            }
+          },
+          success: function(result){
+            $(obj).linkbutton("enable");
+            var result = eval('('+result+')');
+            if (result.errorMsg){
+              $.messager.alert('Error', result.errorMsg, "error");
+            } else {
+              $('#typeDg').datagrid('reload');
+              $.messager.alert('Info', "更新成功！", "info");
+            }
+          }
+        });
+    }
+    
+    function checkDefaultMid() {
+
+        // 初始属性是否被选中
+        var valid = true;
+        var defaultMid = $("#default_material_id").combobox('getValue');
+        if (defaultMid) {
+          valid = $(":checkbox[name^='material_id_']:checked").toArray().some(function(item, index) {
+              return $(item).val() == defaultMid;
+          });
+          if (!valid) {
+              $.messager.alert( 'warning', "初始属性不在该基础款的可选属性集合中！", "warning");
+              return false;
+          }
+        }
+        return valid;
+    }
+    
+    function checkTypeRank() {
+        // 类别显示顺序是否重复
+        var typeRank = parseInt($("#type_rank").val());
+        if (typeRank) {
+        	var parentTypeId = $('#parent_type_id').combobox('getValue');
+        	if (parentTypeId) {
+                $.messager.alert( 'warning', "子属性类别不能设置显示顺序！", "warning");
+                return false;
+        	}
+            var cur_property_type_id = $("#property_type_id").val();
+            return $('#typeDg').datagrid('getRows').every(function(row){
+                if (!row.parent_type_id && row.property_type_id != cur_property_type_id && typeRank == row.rank) {
+                    $.messager.alert( 'warning', "属性类别的显示顺序重复！", "warning");
+                    return false;
+                }
+                return true;
+            });
+        }
+        return true;
+    }
+    
+    function confirmUpdateProperties() {
+
+        var materialTypeId = $('#material_type_id').combobox('getValue');
+        var cur_material_type_id = $("#cur_material_type_id").val();
+        if (cur_material_type_id && !materialTypeId) {
+            $.messager.confirm('更新属性','确认删除之前已关联的原材料类别吗?',function(r){
+              if (r) {
+            	  validateProperties();
+              }
+            });
+        } else if ($("#pt_type").val() == 2 && materialTypeId) {
+        	// 不关联原材料的父类别，会删除其子类别
+            $.messager.confirm('更新属性','该父类别的子类别也将删除，确认更新吗?',function(r){
+              if (r) {
+                  validateProperties();
+              }
+            });
+        } else {
+            validateProperties();
+        }
+    }
+    
+    function validateProperties() {
+    	
+        var parentTypeId = $('#parent_type_id').combobox('getValue');
+        var materialTypeId = $('#material_type_id').combobox('getValue');
+
+        // form validate验证
+        if (!$('#propertyForm').form('validate')) return false;
+        if (!checkTypeRank()) return false;
+
+        if (parentTypeId && !materialTypeId) {
+            $.messager.alert('WARNING', '选择了父类别的子类别必须选择原材料类别！', "warning");
+            return false;
+        } else if (!materialTypeId) {
+            updateProperties();
+        } else if (materialTypeId) {
+
+            var southPanel = $('#prototypeLayout').layout('panel', 'south');
+            // 更新属性时check
+            if (southPanel && southPanel.length > 0) {
+                var valid = true;
+		        valid = checkUnselect();
+		        if (!valid) {
+		            $.messager.alert('WARNING', '请至少选择一个属性！', "warning");
+		            return false;
+		        }
+	            valid = checkDefaultMid();
+	            if (!valid) return false;
+	            
+		        var unchecked = $(":checkbox[name^='material_id_']:not(:checked)");
+		        var material_id;
+		        valid = unchecked.length == 0 || unchecked.toArray().every(function(item, index) {
+		            if ($('#property_id_' + $(item).val()).val()) {
+		            	material_id = $(item).val();
+		                return false;
+		            }
+		            return true;
+		        });
+	            if (!valid) {
+	                $.messager.confirm('更新属性','该类别下有需要删除的属性【'+material_id+'】，确认删除这些属性吗?',function(r){
+	                  if (r) updateProperties();
+	                });
+	            } else {
+	                updateProperties();
+	            }
+            } else {
+                updateProperties();
+            }
+        }
+    }
+    
+    function updateProperties() {
+
+    	var deletedMaterials = [];
+        var deletedProperties = $.map($(":checkbox[name^='material_id_']:not(:checked)"), function(item){
+        	var propertyId = $('#property_id_' + $(item).val()).val();
+        	if (propertyId) deletedMaterials.push($(item).val());
+        	return $('#property_id_' + $(item).val()).val() || null;
+        });
+        checkUpdate(deletedProperties.length, 'checkUpdateProperties', deletedProperties.join('_') +'-'+deletedMaterials.join('_'),',仍然删除吗?', function(){
+	        $('#propertyForm').form('submit',{
+	          url: "${cxt!}/admin/prototype/updateProperties",
+	          onSubmit: function(){
+	          },
+	          success: function(result){
+	            var result = eval('('+result+')');
+	            if (result.errorMsg){
+	              $.messager.alert('Error', result.errorMsg, "error");
+	            } else {
+                  $('#typeDg').datagrid('reload');
+	              $.messager.alert('Info', "更新成功！", "info");
+	            }
+	          }
+	        });
+        });
+    }
+</script>

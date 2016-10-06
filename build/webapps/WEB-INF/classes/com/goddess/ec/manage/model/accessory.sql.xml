@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<sql-statement namespace="manage.accessory">
+
+    <sql id="getAccessoriesByType">
+        <![CDATA[
+            SELECT * 
+              FROM accessory 
+             WHERE accessory_type = ? 
+        ]]>
+    </sql>
+    
+    <sql id="getPrototypeAccessory">
+        <![CDATA[
+            SELECT a.*,
+                   ca.prototype_id
+              FROM accessory a
+         LEFT JOIN commodity_accessory ca
+                ON a.accessory_id = ca.accessory_id 
+               AND ca.prototype_id = ? 
+        ]]>
+    </sql>
+    
+    <sql id="getCommodityAccessory">
+        <![CDATA[
+            SELECT a.*,
+                   ca.commodity_id
+              FROM accessory a
+         LEFT JOIN commodity_accessory ca
+                ON a.accessory_id = ca.accessory_id 
+               AND ca.commodity_id = ? 
+        ]]>
+    </sql>
+
+    <sql id="deletePrototypeAccByType">
+        <![CDATA[
+           DELETE 
+             FROM commodity_accessory 
+            WHERE prototype_id = ? 
+        ]]>
+    </sql>
+
+    <sql id="deleteCommAccByType">
+        <![CDATA[
+           DELETE 
+             FROM commodity_accessory 
+            WHERE commodity_id = ? 
+        ]]>
+    </sql>
+</sql-statement>

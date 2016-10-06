@@ -1,0 +1,170 @@
+<div class="sub-panel">
+    <div id="typeToolbar" style="padding-bottom:5px;">
+        <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-add" onclick="addPropertyType()">添加新类别</a>
+    </div>
+    <table id="typeDg" title="" class="easyui-datagrid" style="width:820px;height:300px"
+        url="${cxt!}/admin/prototype/getNewPropertyTypes/${prototype_id}"
+        toolbar="#typeToolbar" pagination="false"
+        rownumbers="false" singleSelect="true">
+        <thead>
+            <tr>
+                <th field="property_type_id" width="60" align='center'>类别标识</th>
+                <th field="type_name" width="100">类别名称</th>
+                <th field="type_name_ext" width="100">类别名称(英文)</th>
+                <th field="parent_type_id" width="60" align='center'>父类别</th>
+                <th field="material_type_id" width="90" align='center'>原材料类别id</th>
+                <th field="material_type_name" width="150">原材料类别名称</th>
+                <th field="rank" width="100" align='center'>显示顺序</th>
+                <th field="action" width="150" formatter="typeActions" align='center'>操作</th>
+            </tr>
+        </thead>
+    </table>
+    <div style="clear:both;height:5px"></div>
+    <!-- <div class="fitem">
+        <label>属性类别顺序</label>
+        <span id="typeRanks">${type_rank!"未设定顺序"}</span>
+        <div style="margin-left: 120px" id="editTypeArea">
+	        <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-edit" onclick="$('#editTypeArea').hide();$('#rankTypeArea').show()">设定顺序</a>
+            <span style="color:red">* 设定任意前N个非子类别的属性类别，描述格式为：【类别标识,类别标识】,例：2,1</span>
+        </div>
+        <div style="display:none;margin-left: 120px" id="rankTypeArea">
+            <span style="color:red">* 设定任意前N个非子类别的属性类别，描述格式为：【类别标识,类别标识】,例：2,1</span>
+            <input id="type_rank" name="type_rank" class="easyui-textbox" />
+	        <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-edit" onclick='updateTypeRank(${prototype_id}, "${type_rank!}")'>确定</a>
+	        <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-edit" onclick="cancelTypeRank()">取消</a>
+        </div>
+    </div> -->
+</div>
+<script type="text/javascript">
+
+    function typeActions(value, row, index) {
+
+        var et = '<a href="#" onclick="editPropertyType('+row.parent_type_id+','+row.property_type_id+','+row.material_type_id+',\''+row.type_name+'\')">编辑</a> ';
+        var c = '<a href="#" onclick="deletePropertyType('+row.parent_type_id+','+row.property_type_id+','+row.material_type_id+')">删除</a>';
+        return et+c;
+    }
+    
+    function addPropertyType() {
+
+        var centerPanel = $('#prototypeLayout').layout('panel', 'center');
+        var href = "${cxt!}/admin/prototype/getPropertyType/0-"+${prototype_id}+'-0-0';
+        if (centerPanel && centerPanel.length > 0) {
+        	centerPanel.panel('clear');
+        	centerPanel.panel({title:'新类别', href:href});
+        } else {
+            $('#prototypeLayout').layout('add',{
+                region: 'center',
+                height: 310,
+                title:'新类别',
+                collapsible:false,
+                border: false,
+                href:href
+            });
+        }
+        $('#prototypeLayout').layout('remove','south');
+    }
+    
+    function editPropertyType(parent_type_id, property_type_id, material_type_id, type_name) {
+
+        var centerPanel = $('#prototypeLayout').layout('panel', 'center');
+        var href = "${cxt!}/admin/prototype/getPropertyType/"+property_type_id + '-'+${prototype_id}+'-'+(parent_type_id || 0)+'-'+(material_type_id || 0);
+        if (centerPanel && centerPanel.length > 0) {
+        	centerPanel.panel('clear');
+        	centerPanel.panel({title:type_name, href:href});
+        } else {
+            $('#prototypeLayout').layout('add',{
+                region: 'center',
+                height: 300,
+                title:type_name,
+                collapsible:false,
+                border: false,
+                href:href
+            });
+        }
+        
+        $('#prototypeLayout').layout('remove','south');
+        //var southPanel = $('#prototypeLayout').layout('panel', 'south');
+        var href = "${cxt!}/admin/prototype/getMaterialsAndType/"+(material_type_id || 0)+'-'+property_type_id+'-'+${prototype_id};
+        //if (southPanel && southPanel.length > 0) {
+        	//southPanel.panel('clear');
+            //if (material_type_id && withProperties) southPanel.panel({title:'', href:href});
+        //} else {
+        if (material_type_id)
+            $('#prototypeLayout').layout('add',{
+                region: 'south',
+                height: 500,
+                title:'',
+                collapsible:false,
+                border: false,
+                href:href
+        });
+        //}
+    }
+
+    function deletePropertyType(parent_type_id, property_type_id, material_type_id) {
+
+        $.messager.confirm('删除属性类别','该基础款的此种类别及其属性全部将被删除，确认删除吗?',function(r){
+          if (r){
+              checkUpdate(true, 'checkUpdateType', property_type_id,',仍然删除吗?', function(){
+                $.get('${cxt!}/admin/prototype/deletePropertyType/'+property_type_id+'-'+${prototype_id}+'-'+material_type_id,function(result){
+                  if (result.errorMsg){
+                    $.messager.alert( 'Error', result.errorMsg, "error");
+                  } else {
+                    $('#typeDg').datagrid('reload');
+                    $.messager.alert('Info', "更新成功！", "info");
+                  }
+                },'json');
+              });
+          }
+        });
+    }
+    
+    function cancelTypeRank() {
+    	$('#editTypeArea').show();
+    	$('#rankTypeArea').hide();
+    	$('#type_rank').textbox('clear');
+    }
+    
+    function updateTypeRank(property_type_id, cur_rank) {
+    	
+    	var ranks = $("#type_rank").textbox('getValue');
+    	if (!ranks) {
+            $.messager.alert( 'warning', "请输入顺序字串！", "warning");
+    		return false;
+    	}
+    	var rankArr = ranks.split(/[\,,，]/);
+    	if (cur_rank && cur_rank.startsWith(rankArr.join(","))) {
+            $.messager.alert( 'warning', "现在的前"+rankArr.length+"个顺序即是："+ranks, "warning");
+            return false;
+    	}
+    	var curRankArr = cur_rank ? cur_rank.split(",") : [];
+    	var idRank = [];
+    	var valid = rankArr.every(function(rank){
+    		if (!($("#property_type_id_"+rank) && $("#property_type_id_"+rank).val())) {
+                $.messager.alert( 'warning', "类别标识【"+rank+"】的类别未被该原型选择！", "warning");
+    			return false;
+    		// 重复验证
+    		} else if (idRank.indexOf($("#property_type_id_"+rank).val()) > 0) {
+                $.messager.alert( 'warning', "类别标识【"+rank+"】被重复输入！", "warning");
+    			return false;
+    		}
+            curRankArr.remove(rank);
+    		idRank.push($("#property_type_id_"+rank).val());
+    		return true;
+    	});
+    	if (valid) {
+    		// 把之前设定顺序的类别追加在末尾
+    		curRankArr.forEach(function(rank){
+    			idRank.push($("#property_type_id_"+rank).val());
+    		});
+            $.get('${cxt!}/admin/property_type/updateTypeRank/'+property_type_id+'-'+idRank.join(","),function(result){
+              if (result.errorMsg){
+                $.messager.alert( 'Error', result.errorMsg, "error");
+              }
+              $("#typeRanks").text(result.ranks || "未设定顺序");
+              cancelTypeRank();
+            },'json');
+    	}
+    }
+    
+</script>

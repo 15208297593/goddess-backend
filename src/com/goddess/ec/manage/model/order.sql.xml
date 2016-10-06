@@ -1,0 +1,267 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<sql-statement namespace="manage.order">
+
+    <!-- 订单列表展示 -->
+    <sql id="splitPage">
+        <![CDATA[
+              FROM orders o,users u
+             WHERE o.payer_id = u.user_id
+               <% if(!isEmpty(order_date_from)){ %>
+                 AND o.order_date >= #'$order_date_from$'#
+               <% } %>
+               <% if(!isEmpty(order_date_to)){ %>
+                 AND o.order_date <= #'$order_date_to$'#
+               <% } %>
+               <% if(!isEmpty(internal_order_status)){ %>
+                 AND o.internal_order_status = #'$internal_order_status$'#
+               <% } %>
+               <% if(!isEmpty(cell_num)){ %>
+                 AND u.cell_num like #'%$cell_num$%'#
+               <% } %>
+               <% if(!isEmpty(order_id)){ %>
+                 AND o.order_id like #'%$order_id$%'#
+               <% } %>
+            ORDER BY o.order_date desc,o.internal_order_status asc
+        ]]>
+    </sql>
+    
+    <!-- 订单列表展示 -->
+    <sql id="brandOrder">
+        <![CDATA[
+              FROM orders o,users u,
+              (select distinct o.order_id 
+                 from orders o, 
+                      order_commodities oc
+            left join commodities c
+                   on c.commodity_id = oc.commodity_id
+            left join (select uc.user_customization_id, 
+                              p.brand_id 
+                         from user_customization uc, prototype p
+                        where uc.prototype_id = p.prototype_id
+                          and p.brand_id = #'$brand_id$'#) cb
+                   on cb.user_customization_id = oc.user_customization_id
+                where o.order_id = oc.order_id
+                  and (c.brand_id = #'$brand_id$'# or cb.brand_id = #'$brand_id$'#)
+               <% if(!isEmpty(order_date_from)){ %>
+                 AND o.order_date >= #'$order_date_from$'#
+               <% } %>
+               <% if(!isEmpty(order_date_to)){ %>
+                 AND o.order_date <= #'$order_date_to$'#
+               <% } %>
+               <% if(!isEmpty(internal_order_status)){ %>
+                 AND o.internal_order_status = #'$internal_order_status$'#
+               <% } %>
+               <% if(!isEmpty(cell_num)){ %>
+                 AND u.cell_num like #'%$cell_num$%'#
+               <% } %>
+               <% if(!isEmpty(order_id)){ %>
+                 AND o.order_id like #'%$order_id$%'#
+               <% } %>) bo
+             WHERE o.payer_id = u.user_id
+               and o.order_id = bo.order_id
+            ORDER BY o.order_date desc,o.internal_order_status asc
+        ]]>
+    </sql>
+
+    <!-- 商品列表展示 -->
+    <sql id="getReturnOrders">
+        <![CDATA[
+              FROM return_order o,users u
+             WHERE o.return_user_id = u.user_id
+               <% if(!isEmpty(return_apply_date_from)){ %>
+                 AND o.return_apply_date >= #'$return_apply_date_from$'#
+               <% } %>
+               <% if(!isEmpty(return_apply_date_to)){ %>
+                 AND o.return_apply_date <= #'$return_apply_date_from$'#
+               <% } %>
+               <% if(!isEmpty(return_status)){ %>
+                 AND o.return_status = #'$return_status$'#
+               <% } %>
+               <% if(!isEmpty(cell_num)){ %>
+                 AND u.cell_num like #'%$cell_num$%'#
+               <% } %>
+               <% if(!isEmpty(return_order_id)){ %>
+                 AND o.return_order_id like #'%$return_order_id$%'#
+               <% } %>
+            ORDER BY o.return_apply_date desc,o.internal_order_status asc
+        ]]>
+    </sql>
+    
+    <!-- 更新订单状态 -->
+    <sql id="updateOrderStatus">
+        <![CDATA[
+            UPDATE orders
+               SET order_status = ?,
+                   internal_order_status = ?
+             WHERE order_id = ?
+        ]]>
+    </sql>
+
+    <!-- 更新订单状态 -->
+    <sql id="orderToManufacturer">
+        <![CDATA[
+            UPDATE orders
+               SET internal_order_status = ?
+             WHERE order_id = ?
+               AND internal_order_status = ?
+        ]]>
+    </sql>
+    
+    <!-- 更新订单生产商 -->
+    <sql id="updateOrderManufacturer">
+        <![CDATA[
+            UPDATE order_commodities
+               SET manufacturer_id = ?
+             WHERE order_id = ?
+        ]]>
+    </sql>
+    
+    <!-- 订单商品详情 -->
+    <sql id="getOrderCommodities">
+        <![CDATA[ 
+            SELECT oc.*,
+                   m.manufacturer_name,
+                   m.manufacturer_email
+              FROM order_commodities oc
+         LEFT JOIN manufacturer m
+                ON oc.manufacturer_id = m.manufacturer_id
+             WHERE oc.order_id = ?
+        ]]>
+    </sql>
+    
+    <sql id="isBrandComm">
+        <![CDATA[
+       <% if(isEmpty(user_customization_id)){ %>
+            SELECT c.brand_id
+              from commodities c
+             where c.commodity_id = ${commodity_id}
+               and c.brand_id = ${brand_id}
+       <% } else { %>
+              select p.brand_id 
+                from user_customization uc, prototype p
+               where uc.prototype_id = p.prototype_id
+                 and uc.user_customization_id = ${user_customization_id}
+                 and p.brand_id = ${brand_id}
+       <% } %>
+        ]]>
+    </sql>
+
+    <!-- 退货订单详情 -->
+    <sql id="getReturnOrder">
+        <![CDATA[ 
+            SELECT ro.refund_no,
+                   ro.apply_refund_fee,
+                   o.transaction_id,
+                   o.settle_trade_no,
+                   o.payment
+              FROM return_order ro, orders o
+             WHERE ro.order_id = o.order_id
+               AND ro.order_commodity_id = oc.order_commodity_id
+               AND ro.return_order_id = ?
+        ]]>
+    </sql>
+    
+    <!-- 取得某类生产商 -->
+    <sql id="getManufacturers">
+        <![CDATA[ 
+            SELECT *
+              FROM manufacturer
+        ]]>
+    </sql>
+    
+    <!-- 取得用户定制属性 -->
+    <sql id="getCustomizationPros">
+        <![CDATA[ 
+            SELECT *
+              FROM customization_properties
+             WHERE user_customization_id = ?
+        ]]>
+    </sql>
+    
+    <!-- 取得用户定制图片 -->
+    <sql id="getCustomizationPics">
+        <![CDATA[ 
+            SELECT *
+              FROM customization_pic
+             WHERE user_customization_id = ?
+          ORDER BY pic_type,rank
+        ]]>
+    </sql>
+
+    <!-- 取得高端定制 -->
+    <sql id="getHighendCustomization">
+        <![CDATA[ 
+            SELECT o.order_id,
+                   o.consignee_name,
+			       o.consignee_telephone,
+			       o.province_first_stage_name,
+			       o.address_city_second_stage_name,
+			       o.address_counties_third_stage_name,
+			       o.address_detail_info,
+			       o.message,
+			       oc.order_commodity_id,
+			       oc.commodity_pic,
+			       oc.logo_content,
+			       uc.user_customization_id,
+			       uc.user_id,
+			       uc.custome_pic,
+			       uc.customize_name,
+			       ifnull(uc.customize_des, o.message) as customize_des,
+			       uc.base_properties,
+			       uc.price,
+			       uc.customize_tags
+			  FROM orders o,
+			       order_commodities oc,
+			       user_customization uc
+			 WHERE o.order_id = oc.order_id
+			   AND oc.user_customization_id = uc.user_customization_id
+			   AND o.order_id = ?
+        ]]>
+    </sql>
+
+    <!-- 取得定制配饰 -->
+    <sql id="getOrderAccs">
+        <![CDATA[ 
+            SELECT *
+			  FROM order_accessory
+			 WHERE order_commodity_id = ?
+        ]]>
+    </sql>
+
+    <!-- 物流单号是否已被使用 -->
+    <sql id="isDeliveryNoExists">
+        <![CDATA[ 
+            select order_id 
+              from orders 
+             where delivery_com_no = ? 
+               and delivery_no = ?
+        ]]>
+    </sql>
+
+    <!-- 更新关联订单的物流信息及订单状态 -->
+    <sql id="updateDeliveryReferOrder">
+        <![CDATA[ 
+            UPDATE orders o,
+                   (SELECT internal_order_status,
+                           order_status,
+                           delivery_com_no,
+                           delivery_no,
+                           delivery_info,
+                           delivery_sign_date,
+                           order_id
+                      FROM orders
+                     WHERE order_id = ?
+                   ) ro
+               SET o.delivery_order_id = ro.order_id,
+                   o.internal_order_status = ro.internal_order_status,
+                   o.order_status = ro.order_status,
+                   o.delivery_com_no = ro.delivery_com_no,
+                   o.delivery_no = ro.delivery_no,
+                   o.delivery_info = ro.delivery_info,
+                   o.delivery_sign_date = ro.delivery_sign_date
+             WHERE o.order_id = ?
+        ]]>
+    </sql>
+
+</sql-statement>

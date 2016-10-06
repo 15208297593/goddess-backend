@@ -1,0 +1,105 @@
+<div class="sub-panel float-left" >
+    <div id="relateTl" style="padding-bottom:5px;">
+        <% for (t in relate_types) { %>
+          <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-add" onclick="linkType(${t.property_type_id})">关联${t.type_name}</a>
+        <% } %>
+        <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-add" onclick="linkType()">设定价格</a>
+    </div>
+    <table id="baseDg" title="" class="easyui-datagrid" style="width:550px;height:700px"
+        url="${cxt!}/admin/prototype/getBaseMaterials/${base_type}-${base_ref_type}" toolbar="#relateTl"
+        pagination="false" rownumbers="false" singleSelect="false" selectOnCheck="false" idField="property_id" onLoadSuccess="checkRows">
+        <thead>
+            <tr>
+                <th field="is_checked" data-options="checkbox:true"></th>
+                <th field="material_name" align='center' width="100">名称</th>
+                <th field="material_exhibition" align='center' width="100" formatter="exhibition">原材料展示</th>
+                <th field="relate_types" align='center' width="200">已关联类别</th>
+                <th field="base_addition" align='center' width="100">材料价格加成</th>
+            </tr>
+        </thead>
+    </table>
+    <div style="clear:both;height:5px"></div>
+</div>
+<div class="sub-panel">
+    <div style="padding-left:20px">
+        <div class="fitem for_update_input">
+            <label>关联原材料</label><span class='break-line' id='relateNames'></span>
+        </div>
+        <% for (t in relate_types) { %>
+            <div class="fitem">
+                <label>${t.type_name!}(${t.type_name_ext!})</label>
+                  <select id="relate_ref_type_${t.property_type_id}" name="relate_ref_type_${t.property_type_id}" style="width:100px;">
+                      <% for (t in ref_types) { %>
+                          <option value="${t.property_type_id}" ${property_type.relate_ref_type == t.property_type_id ? "selected='selected'" : ""}>${t.type_name}</option>
+                      <% } %>
+                  </select>
+            </div>
+        <% }%>
+        <div class="fitem">
+            <label>价格加成</label>
+            <input id="price_addition" name="price_addition" class="easyui-textbox" required="true" data-options="validType:'integ'" value="">
+        </div>
+    </div>
+    <div style="text-align:right;margin-top:10px">
+        <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-save" onclick="saveBaseRelateType()">保存</a>
+    </div>
+    <div style="clear:both;margin-bottom:5px"></div>
+    <input type="hidden" name="pids" value="${pids!}" id="pids" />
+    <input type="hidden" name="relate_type" value="${relate_type!}" id="relate_type" />
+    <input type="hidden" name="base_type" value="${base_type!}" id="base_type" />
+</div>
+<script type="text/javascript">
+
+    function exhibition(value, row, index) {
+        if (${exhibition_type} == "0") {
+            // 颜色值展示
+            return "<div class='box' style='background-color:"+value+";'></div>";
+        } else {
+            if (!value) value = "/default.jpg";
+            value = value + "?t=" + new Date().getTime();
+            return '<div style="float:left;padding:10px" class="pic"><img src="${imageUrl!}/'+ value +'" style="width:50px;" /></div>';
+        }
+    }
+    
+    function linkType(property_type_id) {
+
+    	var sMaterials = $('#baseDg').datagrid('getChecked');
+    	if (sMaterials.length == 0) {
+
+            $.messager.alert('WARNING', '请至少选择一个原材料！', "warning");
+    		return;
+    	}
+    	var pids = [];
+    	sMaterials.forEach(function(m){
+    		pids.push(m.property_id);
+    	});
+    	title = property_type_id ? '关联类别' : '设定价格';
+        //$('#prototypeLayout').layout('remove','east');
+        var eastPanel = $('#prototypeLayout').layout('panel', 'east');
+        var href = property_type_id ? "${cxt!}/admin/prototype/linkRelatedType/0-${base_type}-"+pids.join('_')+'-'+property_type_id :
+        	"${cxt!}/admin/prototype/linkRelatedType/1-${base_type}-"+pids.join('_');
+        if (eastPanel && eastPanel.length > 0) {
+            eastPanel.panel('clear');
+            eastPanel.panel({title:title, href:href});
+        } else {
+            $('#prototypeLayout').layout('add',{
+                region: 'east',
+                height: 500,
+                width: 350,
+                title:title,
+                collapsible:false,
+                border: false,
+                href:href
+	        });
+        }
+    }
+    
+    function checkRows() {
+    	if (!$('#pids')) return;
+        var pids = $('#pids').val().split('_');
+        pids.forEach(function(id){
+            $('#baseDg').datagrid('checkRow', $('#baseDg').datagrid('getRowIndex', id));
+        });
+    }
+    
+</script>

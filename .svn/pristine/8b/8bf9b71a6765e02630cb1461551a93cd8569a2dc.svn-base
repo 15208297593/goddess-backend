@@ -1,0 +1,17 @@
+<div id="content" style="padding-left:4px;padding-top:4px">
+	<div id="toolbar" style="padding-bottom:5px;">
+	    ${toolbar}
+	</div>
+    ${datagrid}
+	<div id="dlg" class="easyui-dialog" style="width:1000px;height:700px;padding:10px 20px"
+	        closed="true" buttons="#dlg_buttons">
+	    <div class="ftitle">${dialog_title}</div>
+	    <form id="fm" method="post" novalidate>
+	        ${dialog}
+	    </form>
+	</div>
+	<div id="dlg_buttons">
+	       ${dlg_buttons}
+	</div>
+    ${otherDialogs}
+</div>

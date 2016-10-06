@@ -1,0 +1,14 @@
+appid = wx2d789e6ca2ded095
+app_secret = 63fd79841990e0dd2b4d740f639450f1
+api_key = c37d7ca592db4b219a0d400507263ed8
+mch_id = 1232782102
+unifiedorder_url = https://api.mch.weixin.qq.com/pay/unifiedorder
+notify_url= http://www.nvshenzhuyi.com/test/goddess/api/v1/wx/payNotify
+orderquery_url= https://api.mch.weixin.qq.com/pay/orderquery
+global_access_token_url=http://www.nvshenzhuyi.com/nswx/api/accesstoken
+access_token_url=https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=#{appid}&secret=#{secret}
+jsapi_ticket_url=https://api.weixin.qq.com/cgi-bin/ticket/getticket?type=jsapi&access_token=#{access_token}
+authorize_code_url=https://open.weixin.qq.com/connect/oauth2/authorize?appid=#{appid}&redirect_uri=#{redirect_uri}&response_type=code&scope=#{scope}&state=#{state}#wechat_redirect
+sp_access_token_url=https://api.weixin.qq.com/sns/oauth2/access_token?appid=#{appid}&secret=#{secret}&code=#{code}&grant_type=authorization_code
+refund_url=https://api.mch.weixin.qq.com/secapi/pay/refund
+refundquery_url=https://api.mch.weixin.qq.com/pay/refundquery

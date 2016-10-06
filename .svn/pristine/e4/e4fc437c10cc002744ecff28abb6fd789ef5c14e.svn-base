@@ -1,0 +1,446 @@
+<% var toolbar = { %> 
+  <form id="searchForm">
+  <div>
+    <span>用户手机号</span>
+    <input id="cell_num" name="cell_num" class="easyui-textbox">
+    <!-- <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-search" onclick="delTestData()">删除测试数据</a> -->
+  </div>
+  <div style="padding:3px">
+    <span>订单号</span>
+    <input name="order_id" class="easyui-textbox">
+    <span>订单日期</span>
+    <input class="easyui-datebox" id="order_date_from" name="order_date_from" editable="false" style="width:150px"> - 
+    <input class="easyui-datebox" id="order_date_to" name="order_date_to" editable="false" style="width:150px">
+    <span style="margin-left:20px">订单状态</span>
+    <select id="internal_order_status" class="easyui-combobox" name="internal_order_status" style="width:120px;" editable="false">
+      <option value="">所有</option>
+      <option value="0">未支付</option>
+      <option value="1">待下单给生产商</option>
+      <option value="2">待发货给客户</option>
+      <option value="3">待客户签收</option>
+      <option value="4">客户已签收</option>
+      <option value="7">待接入高端定制</option>
+      <option value="8">高端定制中</option>
+      <option value="5">物流错误</option>
+      <option value="6">支付错误</option>
+    </select>
+    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-search" onclick="doSearch()">检索</a>
+    <!-- <a href="${cxt!}/admin/order/exportSuoyuUser" class="easyui-linkbutton" iconCls="icon-edit">导出顺丰批量订单</a> -->
+  </div>
+  </form>
+<%};
+var datagrid = { %> 
+    <table id="dg">
+    </table>
+<%};
+var dialog = { %> 
+<%};
+var otherDialogs = { %> 
+    <div id="orderdlg" class="easyui-dialog" style="width:500px;height:250px;padding:10px 20px" modal="true" closed="true" buttons="#otherDlg_buttons">
+        <div class="fitem forManufacturer dlgBlock">
+	        <label>生产商</label>
+		    <select id="manufacturer_id" class="easyui-combobox" name="manufacturer_id" style="width:100px;" editable="false">
+		      <% for (m in manufacturers) { %>
+		          <option value="${m.manufacturer_id}">${m.manufacturer_name}</option>
+              <% } %>
+		    </select>
+	    </div>
+        <div class="fitem forRefund dlgBlock">
+	        <label>退款金额</label>
+            <input id="refund_fee" name="refund_fee" class="easyui-textbox" data-options="required:true,validType:'integer'" />
+            <input id="ceil_fee" name="ceil_fee" type="hidden" />
+	    </div>
+	    <div class="forCustomer dlgBlock">
+	        <div class="fitem">
+		        <label>快递</label>
+			    <select id="delivery_com_no" name="delivery_com_no" style="width:150px;">
+			          <option value="shunfeng">顺丰</option>
+			          <option value="nvshenzhuyi">女神专送</option>
+			          <option value="refer">关联其他订单物流</option>
+			    </select>
+		    </div>
+            <div class="forDelivery">
+		        <div class="fitem">
+		            <label>快递单号</label>
+		            <input id="delivery_no" name="delivery_no" class="easyui-textbox" data-options="required:true,validType:'maxLength[20]'" />
+		        </div>
+		        <div class="fitem">
+		            <label>出发地城市</label>
+		            <input id="from_city" name="from_city" class="easyui-textbox" data-options="validType:'maxLength[10]'" /><br/>
+		            <span style='color:red;padding-left:120px'>* 选择顺丰快递时必填,例：北京市朝阳区</span>
+		        </div>
+		        <div class="fitem">
+		            <label>目的地城市</label>
+		            <input id="to_city" name="to_city" class="easyui-textbox" data-options="validType:'maxLength[10]'" /><br/>
+		            <span style='color:red;padding-left:120px'>* 选择顺丰快递时必填,例：河北省石家庄市</span>
+		        </div>
+	        </div>
+            <div class="forRefer">
+                <div class="fitem">
+                    <label>关联订单号</label>
+                    <input id="delivery_order_id" name="delivery_order_id" class="easyui-textbox" data-options="required:true,validType:'maxLength[32]'" /><br/>
+                    <span style='color:red;padding-left:120px'>* 与其他订单使用同一快递单号派送时的订单号</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="otherDlg_buttons">
+	    <a href="javascript:void(0)" class="easyui-linkbutton c6" iconCls="icon-ok" onclick="send()" style="width:90px">发送</a>
+	    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-cancel" onclick="javascript:$('#orderdlg').dialog('close')" style="width:90px">取消</a>
+    </div>
+<%};
+var dlg_buttons = { %> 
+    <a href="javascript:void(0)" class="easyui-linkbutton c6" iconCls="icon-save" onclick="updateHighend()" style="width:90px">暂存</a>
+    <a href="javascript:void(0)" class="easyui-linkbutton c6" iconCls="icon-add" onclick="saveHighendCusOrder()" style="width:90px">生成订单</a>
+    <!-- <a href="javascript:void(0)" class="easyui-linkbutton c6" iconCls="icon-cancel" onclick="cancelHignendCusOrder()" style="width:90px">取消订单</a> -->
+    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-cancel" onclick="javascript:$('#dlg').dialog('close')" style="width:90px">关闭</a>
+<%};
+include("/listLayout.html",
+        {toolbar:toolbar,
+        datagrid:datagrid, 
+        dialog:dialog, 
+        dlg_buttons:dlg_buttons,
+        otherDialogs:otherDialogs,
+        dialog_title:""}){}
+%>
+
+<!-- <div class="easyui-layout" id="customizeLayout" style="height:500px">
+    <div data-options="region:'north',collapsible:false,border: false" style="height:300px"></div>
+</div> -->
+<script type="text/javascript" src="${cxt!}/www/js/datagrid-detailview.js"></script>
+<script type="text/javascript">
+
+  $(function(){
+	  var buttons = $.extend([], $.fn.datebox.defaults.buttons);
+	  buttons.splice(1, 1, {
+	      text: 'Clear',
+	      handler: function(target){
+	    	  $(target).datebox("setValue", "");
+	    	  $(this).closest("div.combo-panel").panel("close");
+	      }
+	  });
+	  $('#order_date_from').datebox({
+	      buttons: buttons
+	  });
+	  $('#order_date_to').datebox({
+	      buttons: buttons
+	  });
+      
+      $("#delivery_com_no").change(function(){
+          if ($(this).val() == "nvshenzhuyi") {
+              $("#delivery_no").textbox("setValue", "NS"+new Date().getTime());
+              $(".forDelivery").show();
+              $(".forRefer").hide();
+          } else if ($(this).val() == "refer") {
+              $(".forDelivery").hide();
+              $(".forRefer").show();
+          } else {
+              $(".forDelivery").show();
+              $(".forRefer").hide();
+              $("#delivery_no").textbox("clear");
+          }
+      });
+  });
+  function doSearch() {
+
+	var order_date_from = $("#order_date_from").datebox("getValue");
+	var order_date_to = $("#order_date_to").datebox("getValue");
+	if (order_date_from && order_date_to && order_date_from > order_date_to) {
+        $.messager.alert('Warning', '开始时间应比结束时间早！');
+        return;
+	}
+	var internal_order_status = {'7':'待接入高端定制','8':'高端定制中','0':'未支付','1':'待下单给生产商','2':'待发货给客户','3':'待客户签收','E':'待客户确认','4':'已完成','5':'物流错误','6':'支付错误','7':'已支付订金','8':'高端定制中','F':'高端定制待结算','9':'用户取消订单','A':'已删除','B':'过期未支付','C':'订金订单被取消','D':'取消订单&退款'};
+	var pay_mode = {1:'微信支付',2:'支付宝支付'};
+	var order_source = {1:'PC',2:'微信',3:'APP'};
+	var delivery_com = {'nvshenzhuyi':'女神','shunfeng':'顺丰'};
+    $('#dg').datagrid({
+        title:'',
+        iconCls:'icon-edit',
+        width:1550,
+        height:500,
+        singleSelect:true,
+        idField:'order_id',
+        pagination:true,
+        url:"${cxt!}/admin/order/searchOrders?"+$("#searchForm").serialize(),
+        columns:[[
+            {field:'order_id',title:'订单号',width:120,align:'center',formatter:function(value, row) {
+                return "<span class='break-line'>" + value+"</span>";
+            }},
+            {field:'order_source',title:'订单来源',width:100,align:'center',formatter:function(value, row) {
+            	return order_source[value] || '微信';
+            }},
+            {field:'nick_name',title:'买家',width:100,halign:'center',formatter:function(value, row) {
+                return value+", "+"<span class='break-line'>" + row.cell_num+"</span>";
+            }},
+            {field:'order_amount',title:'订单金额',width:130,halign:'center',formatter:function(value, row) {
+                return "<span>商品总价："+value+"元 </span><br/><span>运费："+(row.freight ? row.freight : 0)+"元</span>";
+            }},
+            {field:'pay_mode',title:'支付信息',width:130,halign:'center',formatter:function(value, row) {
+            	if (row.internal_order_status == '0') {
+            		return '';
+            	}
+                return "<span>"+pay_mode[value]+"："+(row.payment || row.deposit_fee || 0)+"元 </span><br/><span>积分:"+(row.used_points ? row.used_points : 0)+"</span>";
+            }},
+            {field:'order_date',title:'订单日期',width:150,halign:'center'},
+            {field:'consignee_name',title:'收货信息',width:200,halign:'center',formatter:function(value, row) {
+            	if (row.internal_order_status == '0') return '';
+                return "<span>"+value+","+row.consignee_telephone+
+                    "</span><br/><span class='break-line'>"+row.province_first_stage_name+row.address_city_second_stage_name+row.address_counties_third_stage_name+row.address_detail_info+"</span>";
+            }},
+            {field:'delivery_com_no',title:'客户端物流',width:120,halign:'center',formatter:function(value, row) {
+            	return !value ? '' : "<span class='break-line'>" + delivery_com[value]+'派送'+row.delivery_no+"</span>";
+            }},
+            {field:'message',title:'买家留言',width:200,halign:'center',formatter:function(value, row) {
+            	value = (value && value != "null") ? value : '';
+                return "<span class='break-line'>"+value+"</span>";
+            }},
+            {field:'wx_error_msg',title:'支付状态',width:150,align:'center',formatter:function(value, row) {
+                return "<span class='break-line'>" +"微信支付订单号："+(row.transaction_id || row.deposit_transaction_id || "") + "</span><br/>"+
+                "<span class='break-line'>" + (value || "") +"</span>";
+            }},
+            {field:'internal_order_status',title:'订单状态',width:150,align:'center',formatter:function(value) {
+                return internal_order_status[value];
+            }},
+            {field:'actions',title:'操作',width:150,formatter:actions,align:'center'}
+        ]],
+        view: detailview,
+        detailFormatter:function(index,row){
+            return '<div class="orderCommodities" style="padding:5px 0"></div>';
+        },
+        onExpandRow: function(index,row){
+            var ddv = $(this).datagrid('getRowDetail',index).find('div.orderCommodities');
+            ddv.panel({
+                border:false,
+                cache:false,
+                href:'${cxt!}/admin/order/getOrderCommodities/'+row.order_id,
+                onLoad:function(){
+                    $('#dg').datagrid('fixDetailRowHeight',index);
+                }
+            });
+            $('#dg').datagrid('fixDetailRowHeight',index);
+        }
+    });
+  }
+  
+  function formatPic(value, row, index) {
+	  if (!value) value="default.jpg";
+	  return '<img src="${imageUrl!}/' + value +'" style="width:100px;height:100px" >'
+  }
+  
+  function actions(value, row, index) {
+      var u = '<a href="#" onclick="updateDeliveryInfo('+row.order_id+')">修改物流信息</a><br/> ';
+      var s = '<a href="#" onclick="signForCommodity('+row.order_id+')">客户签收</a><br/> ';
+      var h = '<a href="#" onclick="highendCus('+row.order_id+')">高端定制</a><br/> ';
+      var r = '<a href="#" onclick="refund('+row.order_id+','+row.payment+')">退款给客户</a><br/> ';
+      var res = '';
+      if (row.internal_order_status == '1') {
+        res = '<a href="#" onclick="orderToManufacturer('+row.order_id+')">下单给生产商</a><br/>';
+      } else if(row.internal_order_status == '2'){
+        res = '<a href="#" onclick="deliveryToCustomer('+row.order_id+')">发货给客户</a><br/>';
+        // 客服确认生产商是否投入生产
+        res += r;
+      //} else if (row.internal_order_status == '3') {
+      //    res += u;
+      } else if(row.internal_order_status == '7'){
+          var co = '<a href="#" onclick="cancelHighendCusOrder('+row.order_id+','+row.deposit_fee+')">退还订金</a><br/> ';
+          var sh = '<a href="#" onclick="startHighendCus('+row.order_id+')">开启高端定制</a><br/> ';
+    	  res += co+sh;
+      } else if(row.internal_order_status == '8'){
+          var co = '<a href="#" onclick="cancelHighendCusOrder('+row.order_id+','+row.deposit_fee+')">退还订金</a><br/> ';
+    	  res += co+h;
+      } else if (row.internal_order_status == '9' || (row.internal_order_status >= 'A' && row.internal_order_status <= 'D')) {
+    	  return '';
+      } else {
+    	  res += u;
+      }
+      return res+s;
+  }
+
+  var url;
+  function orderToManufacturer(order_id){
+     $('.dlgBlock').hide();
+     $('.forManufacturer').show();
+     $('#orderdlg').dialog({title:'下单给生产商'}).dialog('open');
+     url = "${cxt!}/admin/order/orderToManufacturer/"+order_id;
+  }
+  
+  function deliveryToCustomer(order_id) {
+     $('#orderdlg').dialog({title:'发货给客户'}).dialog('open');
+     $('.dlgBlock').hide();
+     $('.forCustomer').show();
+
+     $("#delivery_com_no").change();
+     url = "${cxt!}/admin/order/deliveryToCustomer/"+order_id
+  }
+  
+  // 开始高级定制
+  function startHighendCus(order_id) {
+
+      $.messager.confirm('Confirm','确认开始高端定制吗?',function(r){
+        if (r){
+            $.get("${cxt!}/admin/order/startHighendCus/"+order_id ,function(result){
+                if (result.errorMsg){
+                  $.messager.alert( 'Error', result.errorMsg);
+                } else {
+                    $('#dg').datagrid('reload');      // reload data
+                    highendCus(order_id);
+                }
+              },'json');
+        }
+      });
+  }
+  
+  function refund(order_id, ceil_fee) {
+
+     $('#orderdlg').dialog({title:'退款给客户'}).dialog('open');
+     $('.dlgBlock').hide();
+     $('.forRefund').show();
+     $('#ceil_fee').val(fee);
+     url = "${cxt!}/admin/order/cancelRefund/"+order_id;
+  }
+  
+  function cancelHighendCusOrder(order_id,ceil_fee) {
+    refund(order_id,ceil_fee);
+    url = "${cxt!}/admin/order/cancelHighendCusOrder/"+order_id;
+  }
+  
+  function updateDeliveryInfo(order_id) {
+
+     $('#orderdlg').dialog({title:'更新物流信息'}).dialog('open');
+     $('.dlgBlock').hide();
+     $('.forCustomer').show();
+     url = "${cxt!}/admin/order/updateDeliveryInfo/"+order_id
+  }
+  
+  function send() {
+	  var params = {};
+	  if($(".forCustomer").is(":visible")) {
+		  
+          params['delivery_com_no'] = $("#delivery_com_no").val();
+          if ($(".forDelivery").is(":visible")) {
+			  if (!($("#delivery_no").textbox('isValid') && $("#from_city").textbox('isValid') && $("#to_city").textbox('isValid'))) return;
+			  if($("#delivery_no").textbox("getValue") == "") {
+	              $.messager.alert( 'Warning', "请输入快递单号！");
+	              return;
+			  } else if ($("#delivery_com_no").val() == 'shunfeng' && !($("#from_city").textbox("getValue") && $("#to_city").textbox("getValue"))) {
+	              $.messager.alert( 'Warning', "请输入出发地和目的地！");
+	              return;
+			  }
+	          params['delivery_no'] = $("#delivery_no").textbox("getValue");
+	          params['from_city'] = $("#from_city").textbox("getValue");
+	          params['to_city'] = $("#to_city").textbox("getValue");
+          } else if ($(".forRefer").is(":visible")) {
+
+              if (!($("#delivery_order_id").textbox('isValid'))) return;
+              params['delivery_order_id'] = $("#delivery_order_id").textbox("getValue");
+          }
+	  } else if ($(".forManufacturer").is(":visible")) {
+          url += "-"+$("#manufacturer_id").combobox("getValue");
+	  } else if ($(".forRefund").is(":visible")) {
+		  if (!$("#refund_fee").textbox('isValid')) return;
+		  
+		  var refundFee = $("#refund_fee").textbox("getValue");
+		  if (refundFee > $("#ceil_fee").val()) {
+              $.messager.alert( 'Warning', "退款金额大于付款金额！");
+              return;
+		  }
+          url += "-"+refundFee;
+	  }
+      $("#delivery_no").textbox("clear");
+      $.post(url, params, function(result){
+        if (result.errorMsg){
+          $.messager.alert( 'Error', result.errorMsg);
+        } else {
+
+            //$('#customizeLayout').layout('panel', 'north').panel({content:result.html});
+        	$('#orderdlg').dialog('close');        // close the dialog
+            $('#dg').datagrid('reload');      // reload data
+        }
+      },'json');
+  }
+
+  function signForCommodity(order_id) {
+
+      $.messager.confirm('Confirm','客户确认已签收吗?',function(r){
+        if (r){
+            $.get("${cxt!}/admin/order/signForCommodity/"+order_id ,function(result){
+                if (result.errorMsg){
+                  $.messager.alert( 'Error', result.errorMsg);
+                } else {
+                    $('#dg').datagrid('reload');      // reload data
+                }
+              },'json');
+        }
+      });
+  }
+  
+  function highendCus(order_id) {
+
+	    $('#dlg').dialog({
+	        closed: false,
+	        cache: false,
+	        title: "高端定制",
+	        href:"${cxt!}/admin/order/initHighendCustomization/"+order_id
+	    });
+  }
+  
+  function updateHighend() {
+
+    /* $('#fm').form('submit',{
+      url: "${cxt!}/admin/order/updateHighend/",
+      onSubmit: function(){
+          var base_properties = $("#base_properties").textbox("getValue").replace(/：/g,':').replace(/“/g, '"').replace(/”/g, '"').replace(/，/g, ',');
+          $("#base_properties").textbox("setValue", base_properties);
+          return $('#fm').form('validate');
+      },
+      success: function(result){
+        var result = eval('('+result+')');
+        if (result.errorMsg){
+          $.messager.alert('Error', result.errorMsg);
+        } else {
+          $('#dlg').dialog('close');        // close the dialog
+          $('#dg').datagrid('reload');  // reload the data
+        }
+      }
+    }); */
+    submitForm("updateHighend");
+  }
+  
+  function saveHighendCusOrder() {
+    submitForm("saveHighendCusOrder");
+  }
+  
+  function submitForm(action) {
+
+    $('#fm').form('submit',{
+      url: "${cxt!}/admin/order/"+action,
+      onSubmit: function(){
+          var base_properties = $("#base_properties").textbox("getValue").replace(/：/g,':').replace(/“/g, '"').replace(/”/g, '"').replace(/，/g, ',');
+          $("#base_properties").textbox("setValue", base_properties);
+          return $('#fm').form('validate');
+      },
+      success: function(result){
+        var result = eval('('+result+')');
+        if (result.errorMsg){
+          $.messager.alert('Error', result.errorMsg);
+        } else {
+          $('#dlg').dialog('close');        // close the dialog
+          $('#dg').datagrid('reload');  // reload the data
+        }
+      }
+    });
+  }
+  
+  function delTestData() {
+
+//      $.get("${cxt!}/admin/order/delTestData/"+$('#cell_num').textbox("getValue") ,function(result){
+      $.get("${cxt!}/admin/customize/genPic/" ,function(result){
+          if (result.errorMsg){
+            $.messager.alert( 'Error', result.errorMsg);
+          } else {
+            //$.messager.alert( 'info', '删除用户【'+result.userId+'】所有订单数据');
+              //$('#dg').datagrid('reload');      // reload data
+          }
+        },'json');
+  }
+</script>

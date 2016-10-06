@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<sql-statement namespace="manage.user">
+
+    <!-- 查询用户，自定义字段和值 -->
+    <sql id="login">
+        <![CDATA[
+            SELECT * FROM admin_users WHERE user_name = ?
+        ]]>
+    </sql>
+
+    <!-- 查询用户，自定义字段和值 -->
+    <sql id="all">
+        <![CDATA[
+            SELECT * FROM users
+        ]]>
+    </sql>
+
+    <!-- 动态SQL处理 -->
+    <sql id="splitPage">
+        <![CDATA[
+            from users u
+            where u.cell_num is not null
+            <% if(!isEmpty(register_date_from)){ %>
+              AND u.register_date >= #'$register_date_from$'#
+            <% } %>
+            <% if(!isEmpty(register_date_to)){ %>
+              AND u.register_date <= #'$register_date_to$'#
+            <% } %>
+            <% if(!isEmpty(cell_num)){ %>
+              AND u.cell_num LIKE #'%$cell_num$%'#
+            <% } %>
+        ]]>
+    </sql>
+
+    <sql id="awardPoints">
+        <![CDATA[
+            UPDATE users
+               SET points = points + ?
+             WHERE user_id = ?
+        ]]>
+    </sql>
+</sql-statement>

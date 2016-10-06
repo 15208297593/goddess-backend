@@ -1,0 +1,149 @@
+<% var toolbar = { %> 
+  <form id="searchForm">
+  <div>
+    <span>用户手机号</span>
+    <input id="cell_num" name="cell_num" class="easyui-textbox">
+  </div>
+  <div style="padding:3px">
+    <span>订单号</span>
+    <input name="order_id" class="easyui-textbox">
+    <span>订单日期</span>
+    <input class="easyui-datebox" id="order_date_from" name="order_date_from" editable="false" style="width:150px"> - 
+    <input class="easyui-datebox" id="order_date_to" name="order_date_to" editable="false" style="width:150px">
+    <span style="margin-left:20px">订单状态</span>
+    <select id="internal_order_status" class="easyui-combobox" name="internal_order_status" style="width:120px;" editable="false">
+      <option value="">所有</option>
+      <option value="0">未支付</option>
+      <option value="1">待下单给生产商</option>
+      <option value="2">待发货给客户</option>
+      <option value="3">待客户签收</option>
+      <option value="4">客户已签收</option>
+      <option value="7">待接入高端定制</option>
+      <option value="8">高端定制中</option>
+      <option value="5">物流错误</option>
+      <option value="6">支付错误</option>
+    </select>
+    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-search" onclick="doSearch()">检索</a>
+  </div>
+  </form>
+<%};
+var datagrid = { %> 
+    <table id="dg">
+    </table>
+<%};
+var dialog = { %> 
+<%};
+var otherDialogs = { %> 
+<%};
+var dlg_buttons = { %> 
+<%};
+include("/listLayout.html",
+        {toolbar:toolbar,
+        datagrid:datagrid, 
+        dialog:dialog, 
+        dlg_buttons:dlg_buttons,
+        otherDialogs:otherDialogs,
+        dialog_title:""}){}
+%>
+
+<script type="text/javascript" src="${cxt!}/www/js/datagrid-detailview.js"></script>
+<script type="text/javascript">
+
+  $(function(){
+	  var buttons = $.extend([], $.fn.datebox.defaults.buttons);
+	  buttons.splice(1, 1, {
+	      text: 'Clear',
+	      handler: function(target){
+	    	  $(target).datebox("setValue", "");
+	    	  $(this).closest("div.combo-panel").panel("close");
+	      }
+	  });
+	  $('#order_date_from').datebox({
+	      buttons: buttons
+	  });
+	  $('#order_date_to').datebox({
+	      buttons: buttons
+	  });
+  });
+  function doSearch() {
+
+	var order_date_from = $("#order_date_from").datebox("getValue");
+	var order_date_to = $("#order_date_to").datebox("getValue");
+	if (order_date_from && order_date_to && order_date_from > order_date_to) {
+        $.messager.alert('Warning', '开始时间应比结束时间早！');
+        return;
+	}
+	var internal_order_status = {'7':'待接入高端定制','8':'高端定制中','0':'未支付','1':'待下单给生产商','2':'待发货给客户','3':'待客户签收','E':'待客户确认','4':'已完成','5':'物流错误','6':'支付错误','7':'已支付订金','8':'高端定制中','F':'高端定制待结算','9':'用户取消订单','A':'已删除','B':'过期未支付','C':'订金订单被取消','D':'取消订单&退款'};
+	var pay_mode = {1:'微信支付',2:'支付宝支付'};
+	var order_source = {1:'PC',2:'微信',3:'APP'};
+	var delivery_com = {'nvshenzhuyi':'女神','shunfeng':'顺丰'};
+	$("#searchForm").append($('#role_brand_id').html());
+    $('#dg').datagrid({
+        title:'',
+        iconCls:'icon-edit',
+        width:1400,
+        height:500,
+        singleSelect:true,
+        idField:'order_id',
+        pagination:true,
+        url:"${cxt!}/admin/order/searchOrders?brand_id=${brand_id!}&"+$("#searchForm").serialize(),
+        columns:[[
+            {field:'order_id',title:'订单号',width:120,align:'center',formatter:function(value, row) {
+                return "<span class='break-line'>" + value+"</span>";
+            }},
+            {field:'order_source',title:'订单来源',width:100,align:'center',formatter:function(value, row) {
+            	return order_source[value] || '微信';
+            }},
+            {field:'nick_name',title:'买家',width:100,halign:'center',formatter:function(value, row) {
+                return value+", "+"<span class='break-line'>" + row.cell_num+"</span>";
+            }},
+            {field:'order_amount',title:'订单金额',width:130,halign:'center',formatter:function(value, row) {
+                return "<span>商品总价："+value+"元 </span><br/><span>运费："+(row.freight ? row.freight : 0)+"元</span>";
+            }},
+            {field:'pay_mode',title:'支付信息',width:130,halign:'center',formatter:function(value, row) {
+            	if (row.internal_order_status == '0') {
+            		return '';
+            	}
+                return "<span>"+pay_mode[value]+"："+(row.payment || row.deposit_fee || 0)+"元 </span><br/><span>积分:"+(row.used_points ? row.used_points : 0)+"</span>";
+            }},
+            {field:'order_date',title:'订单日期',width:150,halign:'center'},
+            {field:'delivery_com_no',title:'客户端物流',width:120,halign:'center',formatter:function(value, row) {
+            	return !value ? '' : "<span class='break-line'>" + delivery_com[value]+'派送'+row.delivery_no+"</span>";
+            }},
+            {field:'message',title:'买家留言',width:200,halign:'center',formatter:function(value, row) {
+            	value = (value && value != "null") ? value : '';
+                return "<span class='break-line'>"+value+"</span>";
+            }},
+            {field:'wx_error_msg',title:'支付状态',width:150,align:'center',formatter:function(value, row) {
+                return "<span class='break-line'>" +"微信支付订单号："+(row.transaction_id || row.deposit_transaction_id || "") + "</span><br/>"+
+                "<span class='break-line'>" + (value || "") +"</span>";
+            }},
+            {field:'internal_order_status',title:'订单状态',width:150,align:'center',formatter:function(value) {
+                return internal_order_status[value];
+            }}
+        ]],
+        view: detailview,
+        detailFormatter:function(index,row){
+            return '<div class="orderCommodities" style="padding:5px 0"></div>';
+        },
+        onExpandRow: function(index,row){
+            var ddv = $(this).datagrid('getRowDetail',index).find('div.orderCommodities');
+            ddv.panel({
+                border:false,
+                cache:false,
+                href:'${cxt!}/admin/order/getOrderCommodities/'+row.order_id+'-'+${brand_id!},
+                onLoad:function(){
+                    $('#dg').datagrid('fixDetailRowHeight',index);
+                }
+            });
+            $('#dg').datagrid('fixDetailRowHeight',index);
+        }
+    });
+  }
+  
+  function formatPic(value, row, index) {
+	  if (!value) value="default.jpg";
+	  return '<img src="${imageUrl!}/' + value +'" style="width:100px;height:100px" >'
+  }
+
+</script>

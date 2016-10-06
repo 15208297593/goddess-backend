@@ -1,0 +1,210 @@
+<form id="commodityfm" enctype='multipart/form-data' method="post" novalidate >
+    <div class="fitem">
+        <label>名称</label>
+        <input name="commodity_name" class="easyui-textbox" data-options="validType:'maxLength[50]'" value="${commodity.commodity_name}">
+    </div>
+    <div class="fitem">
+        <label>来源</label>
+        <span>${commodity.commodity_source == "1" ? "用户" : "商家"}</span>
+    </div>
+    
+    <div class="fitem">
+        <div class="float-left"><label>所属品牌</label></div>
+        <div class='float-left' style='margin-bottom:10px'>
+            <select id="brand" name="brand_id" style="width:100px;margin-left:5px">
+              <% for (b in brands) { %>
+                  <option value="${b.id}" ${commodity.brand_id == b.id ? "selected='selected'" : ""}>${b.name}</option>
+              <% } %>
+            </select>
+        </div>
+    </div>
+    <div style="clear:both"></div>
+    
+    <div class="fitem">
+        <div class="float-left"><label>商品类别</label></div>
+        <div class='float-left' style='margin-bottom:10px'>
+            <select id="category_tree" class="easyui-combotree" cascadeCheck="false" onlyLeafCheck="true" data-options="url:'${cxt!}/admin/commodity/getClassificationTree/${commodity.commodity_id!0}',multiple:true" style="width:200px;margin-left:5px">
+            </select>
+        </div>
+    </div>
+    <div style="clear:both"></div>
+    
+    <div class="fitem">
+        <div class="float-left"><label>商品筛选条件</label></div>
+        <div class='float-left'>
+            <select id="catalog_tree" class="easyui-combotree" cascadeCheck="false" onlyLeafCheck="true" data-options="url:'${cxt!}/admin/commodity/getCatalogTree/${commodity.commodity_id!0}',multiple:true" style="width:200px;margin-left:5px">
+            </select>
+        </div>
+    </div>
+    <div style="clear:both;margin-bottom: 5px;"></div>
+    
+    <div class="fitem" >
+        <div class="float-left"><label>是否新品</label></div>
+        <div class='float-left' style='margin-bottom:10px'>
+            <select id="is_new" name="is_new" style="width:100px;margin-left:5px" >
+                  <option value="0" ${commodity.is_new! == "0" ? "selected='selected'" : ""}>否</option>
+                  <option value="1" ${commodity.is_new! == "1" ? "selected='selected'" : ""}>是</option>
+            </select>
+        </div>
+    </div>
+    
+    <div style="clear:both"></div>
+    <div class="fitem">
+        <div class="float-left"><label>关联定制基础款</label></div>
+        <div class='float-left' style='margin-bottom:10px'>
+            <select id="prototype_id" name="prototype_id" style="width:100px;margin-left:5px" >
+              <option value=""></option>
+              <% for (p in prototypes) { %>
+                  <option value="${p.id}" ${commodity.prototype_id == p.id ? "selected='selected'" : ""}>${p.name}</option>
+              <% } %>
+            </select>
+        </div>
+    </div>
+    
+    <div style="clear:both"></div>
+    <div class="fitem">
+        <label>基本属性描述</label>
+        <input id="base_properties" name="base_properties" class="easyui-textbox" data-options="validType:['maxLength[200]','json']" value='${commodity.base_properties}'>
+        <span style="color:red">* 描述格式为：【"属性名":"属性描述","属性名":"属性描述"】,例："尺寸":"18*18*18","容量":"2升"</span>
+    </div>
+    <div class="fitem">
+        <label>材料详情</label>
+        <input id="detail_properties" name="detail_properties" class="easyui-textbox" data-options="validType:['maxLength[200]','json']" value='${commodity.detail_properties}'>
+        <span style="color:red">* 描述格式为：【"属性名":"属性描述","属性名":"属性描述"】,例："颜色":"红色","皮质":"鳄鱼肚皮"</span>
+    </div>
+    <div class="fitem">
+        <label>描述（不超过200字）</label>
+        <input name="commodity_des" class="easyui-textbox" data-options="validType:'maxLength[200]'" style="width:400px;height:80px" multiline="true" value="${commodity.commodity_des}">
+    </div>
+    <div class="fitem">
+        <label>价格（元）</label>
+        <input name="price" class="easyui-textbox" required="true" data-options="validType:'integer'" value="${commodity.price}">
+    </div>
+    <div class="fitem">
+        <div class="float-left"><label>商品图</label></div>
+        <div style="margin-left: 110px;" id="pic_area">
+            <div style="float:left;padding:10px" class="pic">
+                <input type="file" class="pic" name="commodity_pic_img" contentEditable="false" accept="jpg/jpeg/gif" style="display:none" onchange="uploadFile(this)"/>
+                <img alt="" src="${imageUrl!}/${commodity.commodity_pic!'default.jpg'}" style="width:150px;height:auto" />
+            </div>
+            <a href="javascript:void(0)" class=" easyui-linkbutton c6" iconCls="icon-edit" style="margin:10px" onclick="changeImg(this)">更改图片</a>
+        </div>
+    </div>
+    <div style="clear:both"></div>
+    <!-- <div class="fitem">
+        <div class="float-left"><label>详细介绍图</label></div>
+        <div style="margin-left: 110px;" id="pic_area">
+            <div style="float:left;padding:10px" class="pic">
+                <input type="file" class="pic" name="commodity_pic_detail_" contentEditable="false" accept="jpg/jpeg/gif" style="display:none" onchange="uploadFile(this)"/>
+                <img alt="" src="${imageUrl!}/${commodity_pic_detail!'default.jpg'}" style="width:100px;height:auto"/>
+                <input type="hidden" name="commodity_pic_detail_id" value="${commodity_pic_detail_id!}">
+            </div>
+            <a href="javascript:void(0)" class=" easyui-linkbutton c6" iconCls="icon-edit" style="margin:10px" onclick="changeImg(this)">更改图片</a>
+        </div>
+    </div>
+    <div style="clear:both"></div> -->
+    <div class="fitem">
+        <div class="float-left"><label>轮播图</label></div>
+        <% if(!isEmpty(commodity_pic_carousel)) { %>
+	        <% for (carousel in commodity_pic_carousel) { %>
+		        <div style="float:left;" class="pic">
+		            <img src="${imageUrl!}/${carousel.commodity_pic}" style="width:150px;height:auto">
+		            <a class="c6" style="margin-left:10px" href="javascript:void(0)" onclick="destroyImg(this, ${carousel.commodity_pic_id})">删除</a><br/>
+		        </div>
+	            <input type="hidden" id="delete_commodity_pic_${carousel.commodity_pic_id}" name="delete_commodity_pic_${carousel.commodity_pic_id}" value="">
+	        <% } %>
+        <% } %>
+        <a href="javascript:void(0)" class="for_add easyui-linkbutton c6" iconCls="icon-add" style="margin:10px"
+            onclick="addImg(this)" id="addImg">添加图片</a>
+    </div>
+    <div style="clear:both"></div>
+    
+    <div class="float-left" ><label>可定制logo样式</label></div>
+    <% if(!isEmpty(logos)) { %>
+       <div style="margin-left: 110px;">
+         <% for (t in logos) { %>
+           <ul style="list-style-type:none">
+            <div>${t.logo_type_name}</div>
+            <% for (s in t.all_logos) { %>
+	            <li class="float-left" style="text-align:left;margin:5px">
+	               <div onclick="$(this).next().children(':checkbox').click()"><img src="${imageUrl!}/${s.pic}" style="width:150px;height:auto"></div>
+	               <div style="text-align:center;">
+	                 <input type="checkbox" name="logo_print_${s.id}" ${s.selected ? "checked='checked'" : ""} value="${s.id}" />￥${s.price} ${s.name}
+	               </div>
+	            </li>
+            <% } %>
+           </ul>
+           <div style="clear:both"></div>
+         <% } %>
+        </div>
+    <% } %>
+    <div style="clear:both"></div>
+    <div class="float-left"><label>可用内部开格</label></div>
+    <% if(!isEmpty(slots)) { %>
+        <ul style="margin-left: 110px; list-style-type:none">
+          <% for (s in slots) { %>
+            <li class="float-left" style="text-align:left;margin:5px">
+               <div onclick="$(this).next().children(':checkbox').click()"><img src="${imageUrl!}/${s.accessory_pic}" style="width:150px;height:auto"></div>
+               <div style="text-align:center;">
+                 <input type="checkbox" name="accessory_${s.accessory_id}" ${!isEmpty(s.commodity_id) ? "checked='checked'" : ""} value="${s.accessory_id}" />￥ ${s.accessory_price} ${s.accessory_name} 
+               </div>
+            </li>
+          <% } %>
+        </ul>
+    <% } %>
+    <div style="clear:both"></div>
+    <input type="hidden" name="commodity_id" value="${commodity.commodity_id!}" />
+    <input type="hidden" name="commodity_pic_detail_type" value="1">
+    <input type="hidden" name="commodity_pic_carousel_type" value="2">
+    <input type="hidden" name="prototype_id" value="${commodity.prototype_id!}">
+    <input type="hidden" name="property_key" value="${commodity.property_key!}">
+    <input type="hidden" name="commodity_pic" value="${commodity.commodity_pic!}">
+    <input type="hidden" name="catalog" id="catalog" value="">
+    <input type="hidden" name="classification" id="classification" value="">
+    
+    <div style="clear:both"></div>
+</form>
+
+<script type="text/javascript">
+
+  $(function(){
+  });
+  
+  var maxCarouselNo = ${commodity_pic_carousel_max!0};
+  function changeImg(obj) {
+    $(obj).prev().children(":first").click();
+  }
+
+  function uploadFile(obj, newFile) {
+    var fi = obj.files[0];
+    var reader = new FileReader();
+    reader.onload = function(e) {
+    	if (newFile) {
+   	      $(obj).after('<img src="" style="width:150px;height:auto" >'+
+   	                '<a class="c6" style="margin-left:10px" href="javascript:void(0)" onclick="destroyImg(this)">删除</a><br/>');
+    	}
+        $(obj).next().attr('src', e.target.result);
+    };
+    reader.readAsDataURL(fi);
+  }
+
+  function addImg(obj) {
+	  maxCarouselNo += 1;
+      $(obj).before('<div style="float:left;" class="pic"><input type="file" class="pic" name="commodity_pic_carousel_'+maxCarouselNo+
+                '" contentEditable="false" accept="jpg/jpeg/gif" style="display:none" onchange="uploadFile(this, true)"/>'+
+                '</div>');
+      $(obj).prev().children(":first").click();
+  }
+  
+  function destroyImg(obj, id) {
+	  // 警告
+      $.messager.confirm('Confirm','确认删除吗?',function(r){
+        if (r){
+            if (id) {
+                $("#delete_commodity_pic_"+id).val("1");
+            }
+            $(obj).parent().remove();
+        }
+      });
+  }
+</script>

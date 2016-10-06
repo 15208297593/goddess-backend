@@ -1,0 +1,533 @@
+package com.goddess.ec.manage.controller;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.log4j.Logger;
+
+import com.goddess.ec.manage.annotation.Controller;
+import com.goddess.ec.manage.common.DictKeys;
+import com.goddess.ec.manage.common.SplitPage;
+import com.goddess.ec.manage.constants.AppConstants;
+import com.goddess.ec.manage.model.CategoryType;
+import com.goddess.ec.manage.model.Commodity;
+import com.goddess.ec.manage.model.CommodityPic;
+import com.goddess.ec.manage.plugin.PropertiesPlugin;
+import com.goddess.ec.manage.service.BrandService;
+import com.goddess.ec.manage.service.CommodityService;
+import com.goddess.ec.manage.service.PrototypeService;
+import com.goddess.ec.manage.tools.ToolDateTime;
+import com.goddess.ec.manage.tools.ToolSqlXml;
+import com.goddess.ec.manage.tools.ToolUtils;
+import com.goddess.ec.manage.tools.ToolWeb;
+import com.jfinal.aop.Before;
+import com.jfinal.plugin.activerecord.Db;
+import com.jfinal.plugin.activerecord.Record;
+import com.jfinal.plugin.activerecord.tx.Tx;
+import com.jfinal.upload.UploadFile;
+
+/**
+ * 商品
+ */
+@Controller(controllerKey = "/admin/commodity")
+public class CommodityController extends BaseController {
+
+    @SuppressWarnings("unused")
+    private static Logger log = Logger.getLogger(CommodityController.class);
+
+    /**
+     * 商品列表
+     */
+    public void index() {
+
+        List<Record> catalogTree = CommodityService.service.getCatalogs();
+        
+        Map<String, Record> classifications = CommodityService.service.getClassifications();
+
+    	setAttr("brands", BrandService.service.getAll());
+        setAttr("catalogTree", catalogTree);
+        setAttr("classifications", classifications);
+        
+        render("/commodity/commodityList.html");
+    }
+    
+    public void searchCommodities() {
+        SplitPage sp = new SplitPage();
+        // 检索页基本设定
+        sp.setPageNumber(getParaToInt("page"));
+        sp.setPageSize(getParaToInt("rows"));
+        sp.setOrderColunm(getPara("sort"));
+        sp.setOrderMode(getPara("order"));
+
+        // 检索条件
+        Map<String, String> queryParam = new HashMap<String, String>();
+        
+        queryParam.put("category", getPara("category"));
+        queryParam.put("classification_ids", getPara("classification_ids"));
+        queryParam.put("brand_ids", getPara("brand_ids"));
+        queryParam.put("catalog_ids", getPara("catalog_ids"));
+        // 商品来源
+        queryParam.put("commodity_source", getPara("commodity_source"));
+        queryParam.put("is_new", getPara("is_new"));
+        String commodityStatus = getPara("commodity_status");
+        
+        // 是否上架
+        queryParam.put("is_shelved", StringUtils.isBlank(commodityStatus) ? commodityStatus : (
+        		AppConstants.IS_SHELVED_ON.equals(commodityStatus) ? AppConstants.IS_SHELVED_ON : AppConstants.IS_SHELVED_OFF));
+        // 可否定制
+        queryParam.put("is_customizable", getPara("is_customizable"));
+        // 条件设定
+        sp.setQueryParam(queryParam);
+
+        // 检索处理
+        CommodityService.service.getCommodities(sp);
+
+        Map<String, Object> jsonRes = new HashMap<String, Object>();
+        jsonRes.put("total",  sp.getPage().getTotalRow());
+        jsonRes.put("rows",  sp.getPage().getList());
+        
+        renderJson(jsonRes);
+    }
+    
+    /**
+     * 商品详情（/commodity/getCommodity/1）
+     */
+    public void getCommodity() {
+    	System.out.println("\n\n getCommodity	this is a test flag    "+ToolDateTime.getNow()+"\n\n");
+    	int commodityId = getParaToInt(0);
+    	Commodity c = CommodityService.service.getCommodityById(commodityId);
+    	List<Record> commodityPics = CommodityService.service.getCommodityPics(commodityId);
+    	
+    	List<Record> commodityPicCarousel = new ArrayList<Record>();
+    	int maxRank = 0;
+    	for (Record r : commodityPics) {
+    		String picType = r.getStr("pic_type");
+    		if (AppConstants.COMMODITY_PIC_TYPE_DETAIL.equals(picType)) {
+    			setAttr("commodity_pic_detail", r.getStr("commodity_pic"));
+    			setAttr("commodity_pic_detail_id", r.getInt("commodity_pic_id"));
+    		} else {
+    			commodityPicCarousel.add(r);
+    			maxRank = r.getInt("rank");
+    		}
+    	}
+    	setAttr("commodity_pic_carousel", commodityPicCarousel);
+    	setAttr("commodity_pic_carousel_max", maxRank);
+    	setAttr("commodity", c);
+
+//    	Integer prototypeId = c.getInt("prototype_id");
+//    	if (prototypeId != null) {
+//    		setAttr("ref_price", Prototype.dao.findById(prototypeId).getInt("base_price") + CommodityService.service.getAdditionPrice(c.getStr("property_key")));
+
+//        	List<Record> customizePros = CommodityService.service.getCommodityCustomizationProps(null, commodityId);
+//
+//        	setAttr("tm", customizePros);
+        	setAttr("img_root", PropertiesPlugin.getParamMapValue(DictKeys.image_url));
+//    	}
+    	
+    	
+    	List<Record> commodityAccessory = Db.find(ToolSqlXml.getSql("manage.accessory.getCommodityAccessory"), commodityId);
+    	List<Record> slots = new ArrayList<Record>();
+    	for (Record r : commodityAccessory) {
+    		String type = r.getStr("accessory_type");
+    		if (AppConstants.ACCESSORY_SLOT.equals(type)) {
+    			slots.add(r);
+    		}
+    	}
+    	setAttr("slots", slots);
+    	setAttr("logos", getLogoPrints(commodityId));
+    	
+    	// 商品品牌
+    	setAttr("brands", BrandService.service.getAll());
+    	setAttr("prototypes", PrototypeService.service.getAllPrototypes());
+    	
+    	render("/commodity/commodityDetail.html");
+    }
+    
+    private List<Record> getLogoPrints(int commodityId) {
+    	System.out.println("\n\n getLogoPrints	this is a test flag    "+ToolDateTime.getNow()+"\n\n");
+    	List<Record> logoPrints = Db.find(ToolSqlXml.getSql("manage.logoPrint.getCommodityLogoPrint"), commodityId);
+    	for (Record lp : logoPrints) {
+			String[] allIds = lp.getStr("all_id").split(",");
+			String[] allNames = lp.getStr("all_name").split(",");
+			String[] allPrices = lp.getStr("all_price").split(",");
+			String[] allPics = lp.getStr("all_pic").split(",");
+			String[] allSelected = lp.getStr("all_selected").split(",");
+			lp.remove("all_id", "all_name", "all_price", "all_pic");
+			List<Record> allLogos = new ArrayList<Record>();
+			for (int i = 0; i < allIds.length; i++) {
+				Record logo = new Record();
+				logo.set("id", allIds[i]);
+				logo.set("name", allNames[i]);
+				logo.set("price", allPrices[i]);
+				logo.set("pic", allPics[i]);
+				logo.set("selected", "1".equals(allSelected[i]));
+				allLogos.add(logo);
+			}
+			lp.set("all_logos", allLogos);
+		}
+    	
+    	return logoPrints;
+    }
+    
+    public void getClassificationTree() {
+    	System.out.println("\n\n getClassificationTree	this is a test flag    "+ToolDateTime.getNow()+"\n\n");
+    	List<Record> nodes = Db.find(ToolSqlXml.getSql("manage.commodity.getCommodityClassification"), getParaToInt(0));
+    	Map<Integer, Record> classificationTree = new HashMap<Integer, Record>();
+
+    	Map<String, Record> categories = new HashMap<String, Record>();
+    	List<Record> rootTree = new ArrayList<Record>();
+    	for (Record r : nodes) {
+    		Integer parentId = r.getInt("parent_id");
+
+    		classificationTree.put(r.getInt("id"), r);
+    		if (parentId != 0) {
+
+    			Record node = classificationTree.get(parentId);
+    			List<Record> children = node.get("children");
+    			if (children == null) {
+    				children = new ArrayList<Record>();
+    				node.set("children", children);
+    			}
+    			children.add(r.set("checked", r.get("commodity_id") == null ? false : true).set("value", node.get("value")+"_"+r.get("id")));
+    		// 1级结点，父结点为0
+    		} else {
+    			Record category =categories.get(r.getStr("category"));
+    			if (category == null) {
+        			List<Record> children = new ArrayList<Record>();
+        			String cType = r.getStr("category");
+        			CategoryType ct = CategoryType.getEnumByCode(cType);
+    				category = new Record().set("children", children).set("text", ct.getText()).set("id", ct.getId()).set("value", ct.getCode());
+    				categories.put(r.getStr("category"), category);
+    				
+    				rootTree.add(category);
+    			}
+    			List<Record> children = category.get("children");
+    			children.add(r.set("checked", r.get("commodity_id") == null ? false : true).set("value", category.get("value")+"_"+r.get("id")));
+    		}
+    	}
+    	renderJson(rootTree);
+    }
+    
+    public void getCatalogTree() {
+    	System.out.println("\n\n getCatalogTree    this is a test flag    "+ToolDateTime.getNow()+"\n\n");
+    	List<Record> commodityCatalog = Db.find(ToolSqlXml.getSql("manage.commodity.getCommodityCatalog"), getParaToInt(0));
+    	List<Record> catalogRoots = getTree(commodityCatalog);
+    	
+    	renderJson(catalogRoots);
+    }
+    
+    private List<Record> getTree(List<Record> nodes) {
+    	Map<Integer, Record> catalogTree = new HashMap<Integer, Record>();
+    	List<Record> roots = new ArrayList<Record>();
+    	for (Record r : nodes) {
+    		Integer parentId = r.getInt("parent_id");
+    		r.set("checked", r.get("commodity_id") == null ? false : true);
+    		catalogTree.put(r.getInt("id"), r);
+    		if (parentId != 0) {
+
+    			Record node = catalogTree.get(parentId);
+    			List<Record> children = node.get("children");
+    			if (children == null) {
+    				children = new ArrayList<Record>();
+    				node.set("children", children);
+    			}
+    			children.add(r.set("value", node.get("value") + "_" + r.get("id")));
+    		// 0级结点，父结点为0
+    		} else {
+    			roots.add(r.set("value", r.get("id")));
+    		}
+    	}
+    	return roots;
+    }
+    
+    /**
+     * 商品上架，初始化商品详情页面
+     */
+    public void initCommodity() {
+    	Commodity c = new Commodity();
+    	c.set("commodity_source", AppConstants.COMMODITY_SOURCE_MERCHANT);
+    	setAttr("commodity", c);
+
+    	List<Record> commodityAccessory = Db.find(ToolSqlXml.getSql("manage.accessory.getCommodityAccessory"), 0);
+    	List<Record> slots = new ArrayList<Record>();
+    	for (Record r : commodityAccessory) {
+    		String type = r.getStr("accessory_type");
+    		if (AppConstants.ACCESSORY_SLOT.equals(type)) {
+    			slots.add(r);
+    		}
+    	}
+    	setAttr("accessory_type_slot", AppConstants.ACCESSORY_SLOT);
+    	setAttr("slots", slots);
+    	setAttr("logos", getLogoPrints(0));
+    	
+    	// 商品品牌
+    	setAttr("brands", BrandService.service.getAll());
+    	setAttr("prototypes", PrototypeService.service.getAllPrototypes());
+    	render("/commodity/commodityDetail.html");
+    }
+    
+    /**
+     * 更新商品
+     * @throws IOException 
+     */
+    @Before(Tx.class)
+    public void update() {
+    	try {
+			updateCommodity(false);
+		} catch (IOException e) {
+			e.printStackTrace();
+			setAttr("errorMsg", "上传图片存储失败！");
+		}
+    	renderJson(new String[]{"errorMsg"});
+    }
+
+    /**
+     * 商品重新上架
+     * @throws IOException
+     */
+    @Before(Tx.class)
+    public void shelve() {
+    	try {
+			updateCommodity(true);
+		} catch (IOException e) {
+			e.printStackTrace();
+			setAttr("errorMsg", "上传图片存储失败！");
+		}
+    	renderJson(new String[]{"errorMsg"});
+    }
+    
+    private void updateCommodity(boolean shelve) throws IOException {
+    	// 0.商品图片
+    	List<UploadFile> upFiles = getFiles();
+    	
+    	Integer commodityId = getParaToInt("commodity_id");
+    	Integer brandId = getParaToInt("brand_id");
+    	
+    	Commodity c = Commodity.dao.findById(commodityId);
+    	uploadPic(upFiles, commodityId, c);
+		// 更新商品
+    	c.set("commodity_name", getPara("commodity_name")).set(
+    		"base_properties", getPara("base_properties")).set(
+			"detail_properties", getPara("detail_properties")).set(
+			"commodity_des", getPara("commodity_des")).set(
+			"is_new", getPara("is_new")).set(
+			"prototype_id", getParaToInt("prototype_id", null)).set(
+			"price", getParaToInt("price")).set(
+			"brand_id", brandId);
+    	
+    	updateCommClassificationAndCatalog(commodityId, brandId);
+    	updateAcc(commodityId);
+    	// 更新上架
+		if (shelve)
+			c.set("shelve_date", ToolDateTime.getNow()).set(
+			"is_shelved", AppConstants.IS_SHELVED_ON);
+		c.update();
+    }
+    
+    /**
+     * 更新分类和筛选
+     * 
+     * @param commodityId
+     * @param brandId
+     * @param category
+     */
+    private void updateCommClassificationAndCatalog(Integer commodityId, Integer brandId) {
+
+    	// 删除原有的类别id
+    	Db.update(ToolSqlXml.getSql("manage.commodity.deleteClassificationByCommodity"), commodityId);
+    	// 更新商品分类
+    	if (StringUtils.isNotEmpty(getPara("classification"))) {
+    		Set<String> allClassifications = new HashSet<String>();
+    		String[] classifications = getPara("classification").split(",");
+    		// 添加新的类别id
+    		for (String cid : classifications) {
+    			String[] ids = cid.split("_");
+    			for (int i = 1; i< ids.length; i++) {
+	    			if (allClassifications.contains(ids[i])) continue;
+	    			allClassifications.add(ids[i]);
+	    			Db.update(ToolSqlXml.getSql("manage.commodity.addCommodityClassification"), commodityId, Integer.valueOf(ids[i]), brandId, ids[0]);
+    			}
+    		}
+//    	} else {
+//    		Db.update(ToolSqlXml.getSql("manage.commodity.updateClassificationBrand"), brandId, commodityId);
+    	}
+
+    	// 删除原有的目录id
+    	Db.update(ToolSqlXml.getSql("manage.commodity.deleteCatalogByCommodity"), commodityId);
+    	// 更新商品筛选条件
+    	if (StringUtils.isNotEmpty(getPara("catalog"))) {
+    		Set<String> allCatalogs = new HashSet<String>();
+    		String[] catalogs = getPara("catalog").split(",");
+    		// 添加新的目录id
+    		for (String cid : catalogs) {
+    			String[] ids = cid.split("_");
+    			for (int i = 0; i< ids.length; i++) {
+	    			if (allCatalogs.contains(ids[i])) continue;
+	    			allCatalogs.add(ids[i]);
+	    			Db.update(ToolSqlXml.getSql("manage.commodity.addCommodityCatalog"), commodityId, ids[i]);
+    			}
+    		}
+    	}
+    }
+    
+    /**
+     * 上传商品图片
+     * @param upFiles
+     * @param commodityId
+     * @param c
+     * @throws IOException
+     */
+    private void uploadPic(List<UploadFile> upFiles, int commodityId, Commodity c) throws IOException {
+
+    	// 1.添加商品图片
+		for (UploadFile f : upFiles) {
+			String picType = f.getParameterName();
+			String saveURL = ToolUtils.saveUploadFile(f, AppConstants.RELATIVE_PATH_COMMODITY + commodityId, 
+					picType, ToolUtils.getExtension(f.getOriginalFileName()));
+			if ("commodity_pic_img".equals(picType)) {
+				c.set("commodity_pic", saveURL);
+			} else if (StringUtils.isNotBlank(getPara(picType+"id"))) {
+				CommodityPic.dao.findById(getParaToInt(picType+"id")).set("commodity_pic", saveURL).update();
+			} else {
+				String rank = picType.substring(picType.lastIndexOf("_")+1);
+				picType = picType.substring(0, picType.lastIndexOf("_")+1);
+				CommodityPic cp = new CommodityPic().set("commodity_id", commodityId).set(
+														"pic_type", getPara(picType+"type")).set(
+														"commodity_pic", saveURL).set(
+														"rank", StringUtils.isBlank(rank) ? 0 : Integer.valueOf(rank));
+				cp.save();
+			}
+		}
+		// 2. 删除商品轮播图图片
+		Map<String, String> params = ToolWeb.getParamMap(getRequest());
+		for(String key : params.keySet()) {
+			if (key.startsWith("delete_commodity_pic_") && AppConstants.DELETE_FLAG_INVALID.equals(params.get(key))) {
+				CommodityPic.dao.deleteById(key.replace("delete_commodity_pic_", ""));
+			}
+		}
+    }
+    
+    /**
+     * 更新配饰和logo
+     */
+    private void updateAcc(int commodityId) {
+
+		Map<String, String> params = ToolWeb.getParamMap(getRequest());
+		// 删除现有的
+		Db.update(ToolSqlXml.getSql("manage.accessory.deleteCommAccByType"), commodityId);
+//		Db.update(ToolSqlXml.getSql("manage.logoPrint.deleteCommLogoPrint"), commodityId);
+		for(String key : params.keySet()) {
+			// 添加新的配饰
+			if (key.startsWith("accessory_")) {
+				Db.save("commodity_accessory", "accessory_id", new Record().set("accessory_id", params.get(key)).set(
+											"commodity_id", commodityId));
+			} else if (key.startsWith("logo_print_")) {
+				Db.save("commodity_accessory", "logo_print_id", new Record().set("logo_print_id", params.get(key)).set(
+						"commodity_id", commodityId));
+			} 
+		}
+    }
+    
+    /**
+     * 商品上架
+     * @throws IOException
+     */
+    @Before(Tx.class)
+    public void saveCommodity() throws IOException {
+
+    	// 0.商品图片
+    	List<UploadFile> upFiles = getFiles();
+
+    	Integer brandId = getParaToInt("brand_id");
+    	Commodity c = new Commodity();
+		// 更新商品
+    	c.set("commodity_name", getPara("commodity_name")).set(
+    		"base_properties", getPara("base_properties")).set(
+			"detail_properties", getPara("detail_properties")).set(
+			"commodity_source", AppConstants.COMMODITY_SOURCE_MERCHANT).set(
+			"commodity_des", getPara("commodity_des")).set(
+			"is_new", getPara("is_new")).set(
+			"prototype_id", getParaToInt("prototype_id", null)).set(
+			"price", getParaToInt("price")).set(
+			"brand_id", brandId).set(
+//			"return_points", calcReturnPoints(getParaToInt("price"))).set(
+			"shelve_date", ToolDateTime.getNow()).set(
+			"is_shelved", AppConstants.IS_SHELVED_ON).save();
+    	int commodityId = c.getInt("commodity_id");
+    	c = Commodity.dao.findById(commodityId);
+		uploadPic(upFiles, commodityId, c);
+
+    	updateCommClassificationAndCatalog(commodityId, brandId);
+    	updateAcc(commodityId);
+		// 更新商品图片地址
+		c.update();
+    	renderJson(new String[]{});
+    }
+    
+    /**
+     * 验证需要下架的商品
+     */
+    public void checkWithdraw() {
+    	
+    	int commodityId = getParaToInt(0);
+    	// 是否在购物车中
+    	Record r = null;
+    	if ((r = Db.findFirst(ToolSqlXml.getSql("manage.commodity.getScCommodity"), commodityId)) != null) {
+			setAttr("errorMsg", "即将删除的商品在用户【"+r.getStr("cell_num")+"】的购物车中");
+//		} else if ((r = Db.findFirst(ToolSqlXml.getSql("manage.commodity.getUnpaidCommodity"), 0, commodityId)) != null) {
+//			setAttr("errorMsg", "即将删除的商品在用户【"+r.getStr("cell_num")+"】的未支付订单中");
+		}
+    	renderJson(new String[]{"errorMsg"});
+    }
+
+    @Before(Tx.class)
+    public void withdraw() {
+
+    	int commodityId = getParaToInt(0);
+		// 删除原有的类别id
+		Db.update(ToolSqlXml.getSql("manage.commodity.deleteClassificationByCommodity"), commodityId);
+		// 删除原有的筛选目录id
+		Db.update(ToolSqlXml.getSql("manage.commodity.deleteCatalogByCommodity"), commodityId);
+    	Commodity.dao.findById(commodityId).set("is_shelved", AppConstants.IS_SHELVED_OFF).set("withdraw_date", ToolDateTime.getNow()).update();
+    	renderJson(new String[]{"errorMsg"});
+    }
+
+    /**
+     * 配置logo和开格
+     */
+    @Before(Tx.class)
+    public void configAcc() {
+
+		List<Record> comms = Db.find(ToolSqlXml.getSql("manage.commodity.getConfigurableComm"), AppConstants.IS_SHELVED_ON, AppConstants.CATEGORY_BAG);
+		List<Record> prototypes = Db.find(ToolSqlXml.getSql("manage.commodity.getConfigurablePrototype"), AppConstants.DELETE_FLAG_VALID, AppConstants.CATEGORY_BAG);
+		comms.addAll(prototypes);
+		// TODO 删除已有配置数据
+		
+		List<Record> slots = Db.find(ToolSqlXml.getSql("manage.accessory.getAccessoriesByType"), AppConstants.ACCESSORY_SLOT);
+		List<Record> logos = Db.find(ToolSqlXml.getSql("manage.logoPrint.getLogoPrints"));
+		
+		List<Record> acc = new ArrayList<Record>();
+		for (Record r : comms) {
+			for (Record s : slots) {
+				if (!"钥匙扣".equals(s.getStr("accessory_name"))) {
+					if (Double.valueOf(r.getStr("height").trim()) >= 25)
+						acc.add(new Record().set("accessory_id", s.get("accessory_id")).set("commodity_id", r.get("commodity_id")).set("prototype_id", r.get("prototype_id")));
+				} else {
+					acc.add(new Record().set("accessory_id", s.get("accessory_id")).set("commodity_id", r.get("commodity_id")).set("prototype_id", r.get("prototype_id")));
+				}
+			}
+			for (Record s : logos) {
+				acc.add(new Record().set("logo_print_id", s.get("logo_print_id")).set("commodity_id", r.get("commodity_id")).set("prototype_id", r.get("prototype_id")));
+			}
+		}
+		
+		Db.batch(ToolSqlXml.getSql("manage.commodity.addCommodityAcc"), "accessory_id, logo_print_id, prototype_id, commodity_id", acc, acc.size());
+    	renderJson(new String[]{"errorMsg"});
+    }
+}

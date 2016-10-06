@@ -1,0 +1,20 @@
+package com.goddess.ec.manage.model;
+
+import org.apache.log4j.Logger;
+
+import com.goddess.ec.manage.annotation.Table;
+
+@Table(tableName = "customization_accessory", pkName = "customization_accessory_id")
+public class CustomizationAccessory extends BaseModel<CustomizationAccessory> {
+
+    /**
+	 * 
+	 */
+	private static final long serialVersionUID = -7561613829109407664L;
+
+	@SuppressWarnings("unused")
+    private static Logger log = Logger.getLogger(CustomizationAccessory.class);
+
+    public static final CustomizationAccessory dao = new CustomizationAccessory();
+
+}

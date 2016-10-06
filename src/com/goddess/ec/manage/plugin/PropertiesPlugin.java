@@ -1,0 +1,123 @@
+package com.goddess.ec.manage.plugin;
+
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
+
+import com.jfinal.log.Logger;
+import com.jfinal.plugin.IPlugin;
+import com.goddess.ec.manage.common.DictKeys;
+
+/**
+ * 读取Properties配置文件数据放入缓存
+ * 
+ * @author dongyihao 2014年9月27日 下午11:14:47
+ */
+public class PropertiesPlugin implements IPlugin {
+
+	protected final Logger log = Logger.getLogger(getClass());
+
+	/**
+	 * 保存系统配置参数值
+	 */
+	private static Map<String, Object> paramMap = new HashMap<String, Object>();
+
+	private Properties properties;
+
+	public PropertiesPlugin(Properties properties) {
+		this.properties = properties;
+	}
+	
+	public static void loadOtherPro(Properties properties) {
+
+		Enumeration<Object> eles = properties.keys();
+		while (eles.hasMoreElements()) {
+			String key = eles.nextElement().toString();
+			paramMap.put(key, properties.get(key));
+		}
+	}
+
+	/**
+	 * 获取系统配置参数值
+	 * 
+	 * @param key
+	 * @return
+	 */
+	public static Object getParamMapValue(String key) {
+		return paramMap.get(key);
+	}
+
+	@Override
+	public boolean start() {
+		paramMap.put(DictKeys.db_type_key, properties.getProperty(DictKeys.db_type_key).trim());
+
+		// 判断数据库类型
+		String db_type = (String) getParamMapValue(DictKeys.db_type_key);
+		if (db_type.equals(DictKeys.db_type_mysql)) { // mysql 数据库连接信息
+			// 读取当前配置数据库连接信息
+			paramMap.put(DictKeys.db_connection_driverClass, "com.mysql.jdbc.Driver");
+			paramMap.put(DictKeys.db_connection_jdbcUrl, properties.getProperty("mysql.jdbcUrl").trim());
+			paramMap.put(DictKeys.db_connection_userName, properties.getProperty("mysql.userName").trim());
+			paramMap.put(DictKeys.db_connection_passWord, properties.getProperty("mysql.passWord").trim());
+
+			// 解析数据库连接URL，获取数据库名称
+			String jdbcUrl = (String) getParamMapValue(DictKeys.db_connection_jdbcUrl);
+			String database = jdbcUrl.substring(jdbcUrl.indexOf("//") + 2);
+			database = database.substring(database.indexOf("/") + 1, database.indexOf("?"));
+
+			// 解析数据库连接URL，获取数据库地址IP
+			String ip = jdbcUrl.substring(jdbcUrl.indexOf("//") + 2);
+			ip = ip.substring(0, ip.indexOf(":"));
+
+			// 解析数据库连接URL，获取数据库地址端口
+			String port = jdbcUrl.substring(jdbcUrl.indexOf("//") + 2);
+			port = port.substring(port.indexOf(":") + 1, port.indexOf("/"));
+
+			// 把数据库连接信息写入常用map
+			paramMap.put(DictKeys.db_connection_ip, ip);
+			paramMap.put(DictKeys.db_connection_port, port);
+			paramMap.put(DictKeys.db_connection_dbName, database);
+
+		}
+
+		// 数据库连接池信息
+		paramMap.put(DictKeys.db_initialSize, Integer.parseInt(properties.getProperty(DictKeys.db_initialSize).trim()));
+		paramMap.put(DictKeys.db_minIdle, Integer.parseInt(properties.getProperty(DictKeys.db_minIdle).trim()));
+		paramMap.put(DictKeys.db_maxActive, Integer.parseInt(properties.getProperty(DictKeys.db_maxActive).trim()));
+
+		// 把常用配置信息写入map
+		paramMap.put(DictKeys.config_devMode, properties.getProperty(DictKeys.config_devMode).trim());
+		paramMap.put(DictKeys.config_securityKey_key, properties.getProperty(DictKeys.config_securityKey_key).trim());
+		paramMap.put(DictKeys.config_passErrorCount_key,
+		        Integer.parseInt(properties.getProperty(DictKeys.config_passErrorCount_key)));
+		paramMap.put(DictKeys.config_passErrorHour_key,
+		        Integer.parseInt(properties.getProperty(DictKeys.config_passErrorHour_key)));
+		paramMap.put(DictKeys.config_maxPostSize_key,
+		        Integer.valueOf(properties.getProperty(DictKeys.config_maxPostSize_key)));
+		paramMap.put(DictKeys.config_maxAge_key, Integer.parseInt(properties.getProperty(DictKeys.config_maxAge_key)));
+
+		// 图片上传根路径
+		paramMap.put(DictKeys.image_path, properties.getProperty(DictKeys.image_path));
+		paramMap.put(DictKeys.image_root, properties.getProperty(DictKeys.image_root));
+		paramMap.put(DictKeys.image_url, properties.getProperty(DictKeys.image_url));
+		paramMap.put(DictKeys.resource_root, properties.getProperty(DictKeys.resource_root));
+
+		paramMap.put(DictKeys.delivery_key, properties.getProperty(DictKeys.delivery_key));
+		paramMap.put(DictKeys.delivery_poll_url, properties.getProperty(DictKeys.delivery_poll_url));
+		paramMap.put(DictKeys.delivery_callbackurl, properties.getProperty(DictKeys.delivery_callbackurl));
+		paramMap.put(DictKeys.delivery_sf_start, properties.getProperty(DictKeys.delivery_sf_start));
+		paramMap.put(DictKeys.delivery_ns_start, properties.getProperty(DictKeys.delivery_ns_start));
+		paramMap.put(DictKeys.delivery_ns_finish, properties.getProperty(DictKeys.delivery_ns_finish));
+
+		paramMap.put(DictKeys.logo_print_price, Integer.parseInt(properties.getProperty(DictKeys.logo_print_price)));
+		return true;
+	}
+
+	@Override
+	public boolean stop() {
+		paramMap.clear();
+		return true;
+	}
+
+}

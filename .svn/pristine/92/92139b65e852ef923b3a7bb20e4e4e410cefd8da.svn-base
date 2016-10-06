@@ -1,0 +1,151 @@
+<form id="fm" method="post" novalidate enctype='multipart/form-data'>
+<div class="sub-panel">
+
+    <input type="hidden" name="classification" id="classification" />
+    <input type="hidden" name="prototype_id" id="dlg_prototype_id" value="${p.prototype_id}"/>
+    <div class="fitem">
+        <label>基础款名称</label>
+        <input id="prototype_name" name="prototype_name" class="easyui-textbox" data-options="validType:'maxLength[50]'" value="${p.prototype_name}">
+    </div>
+    <div class="fitem">
+        <label>基础款描述（不超过200字）</label>
+        <input name="prototype_des" class="easyui-textbox" data-options="validType:'maxLength[500]'" style="width:400px;height:80px" multiline="true" value="${p.prototype_des}">
+    </div>
+    <div class="fitem">
+        <label>基础价格</label>
+        <input name="base_price" class="easyui-textbox" required="true" data-options="validType:'integ'" value="${p.base_price}">
+    </div>
+    <div class="fitem">
+        <label>用户印花价格</label> 
+        <input name="print_price" class="easyui-textbox" data-options="validType:'integer'" value="${p.print_price}">
+    </div>
+    <div class="fitem">
+        <label>基本属性描述</label>
+        <input id="base_properties" name="base_properties" class="easyui-textbox" data-options="validType:['maxLength[200]','json']" value='${p.base_properties}'>
+        <span style="color:red">* 描述格式为：【"属性名":"属性描述","属性名":"属性描述"】,例："尺寸":"18*18*18","容量":"2升"</span>
+    </div>
+    
+    <div class="fitem">
+        <div class="float-left"><label>所属品牌</label></div>
+        <div class='float-left' style='margin-bottom:10px'>
+            <select id="brand" name="brand_id" style="width:100px;margin-left:5px">
+              <% for (b in brands) { %>
+                  <option value="${b.id}" ${p.brand_id == b.id ? "selected='selected'" : ""}>${b.name}</option>
+              <% } %>
+            </select>
+        </div>
+    </div>
+    <div style="clear:both"></div>
+    
+    <div class="fitem">
+        <div class="float-left"><label>基础款类别</label></div>
+        <div class='float-left' style='margin-bottom:10px'>
+            <select id="category_tree" class="easyui-combotree" cascadeCheck="false" onlyLeafCheck="true" data-options="url:'${cxt!}/admin/prototype/getClassificationTree/${p.prototype_id!0}',multiple:true" style="width:200px;margin-left:5px">
+            </select>
+        </div>
+    </div>
+    <div style="clear:both"></div>
+    <div class="fitem">
+        <div class="float-left"><label>基础款图片</label></div>
+        <div style="margin-left: 110px;" id="pic_area">
+            <div style="float:left;padding:10px" class="pic">
+                <input type="file" class="pic" name="prototype_pic_file" contentEditable="false" accept="jpg/jpeg/gif" style="display:none" onchange="uploadFile(this)"/>
+                <img alt="" src='${imageUrl!}/${p.prototype_pic!"default.jpg"}' style="width:150px;height:auto" id="prototype_pic_img" />
+                <input type="hidden" name="prototype_pic_delete" id="prototype_pic_delete" />
+            </div>
+            <a href="javascript:void(0)" class=" easyui-linkbutton c6" iconCls="icon-edit" style="margin:10px" onclick="changeImg(this)" id="btnChange">更改图片</a>
+        </div>
+    </div>
+    <div style="clear:both"></div>
+    
+    <div class="float-left"><label>可用内部开格</label></div>
+    <% if(!isEmpty(slots)) { %>
+        <div style="margin-left: 110px;">
+          <% for (s in slots) { %>
+            <div class="float-left" style="text-align:left;margin:5px" >
+               <div onclick="$(this).next().children(':checkbox').click()"><img src="${imageUrl!}/${s.accessory_pic}" style="width:150px;height:auto"></div>
+		       <div style="text-align:center;">
+                 <input type="checkbox" name="prototype_accessory_${s.accessory_id}" ${!isEmpty(s.prototype_id) ? "checked='checked'" : ""} value="${s.accessory_id}" />价格：${s.accessory_price}
+		       </div>
+            </div>
+          <% } %>
+        </div>
+    <% } %>
+    <div style="clear:both"></div>
+    
+    <div class="float-left" ><label>可定制logo样式</label></div>
+    <% if(!isEmpty(logos)) { %>
+       <div style="margin-left: 110px;">
+           <% for (s in logos) { %>
+            <div class="float-left" style="text-align:left;margin:5px">
+               <div onclick="$(this).next().children(':checkbox').click()"><img src="${imageUrl!}/${s.accessory_pic}" style="width:150px;height:auto"></div>
+		       <div style="text-align:center;">
+                 <input type="checkbox" name="prototype_accessory_${s.accessory_id}" ${!isEmpty(s.prototype_id) ? "checked='checked'" : ""} value="${s.accessory_id}" />价格：${s.accessory_price}
+		       </div>
+             </div>
+           <% } %>
+        </div>
+    <% } %>
+    <div style="clear:both"></div>
+    <div style="clear:both"></div>
+    <div class="fitem">
+        <div class="float-left"><label>轮播图</label></div>
+        <% if(!isEmpty(pic_carousel)) { %>
+            <% for (c in pic_carousel) { %>
+                <div style="float:left;" class="pic">
+                    <img src="${imageUrl!}/${c.pic_url}" style="width:150px;height:auto">
+                    <a class="c6" style="margin-left:10px" href="javascript:void(0)" onclick="destroyImg(this, ${c.prototype_pic_id})">删除</a><br/>
+                </div>
+                <input type="hidden" id="delete_prototype_pic_${c.prototype_pic_id}" name="delete_prototype_pic_${c.prototype_pic_id}" value="0">
+            <% } %>
+        <% } %>
+        <a href="javascript:void(0)" class="for_add easyui-linkbutton c6" iconCls="icon-add" style="margin:10px"
+            onclick="addImg(this)" id="addImg">添加图片</a>
+    </div>
+</div>
+</form>
+<script type="text/javascript">
+
+  var maxCarouselNo = ${pic_carousel_max!0};
+  $(function(){
+  })
+  
+  function changeImg(obj) {
+    $(obj).prev().children(":first").click();
+  }
+
+  function uploadFile(obj, newFile) {
+    var fi = obj.files[0];
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        if (newFile) {
+          $(obj).after('<img src="" style="width:150px;height:auto" >'+
+                    '<a class="c6" style="margin-left:10px" href="javascript:void(0)" onclick="destroyImg(this)">删除</a>');
+        }
+        $(obj).next().attr('src', e.target.result);
+    };
+    reader.readAsDataURL(fi);
+  }
+
+  function addImg(obj) {
+	  maxCarouselNo += 1;
+      $(obj).before('<div style="float:left;" class="pic">'+
+    		        '<input type="file" class="pic" name="prototype_carousel_'+maxCarouselNo+
+    		        '" contentEditable="false" accept="jpg/jpeg/gif" style="display:none" onchange="uploadFile(this, true)"/>'+
+    		        '</div>');
+      $(obj).prev().children(":first").click();
+  }
+  
+  function destroyImg(obj, id) {
+      // 警告
+      $.messager.confirm('Confirm','确认删除吗?',function(r){
+        if (r){
+            if (id) {
+                $("#delete_prototype_pic_"+id).val("1");
+            }
+            $(obj).parent().remove();
+        }
+      });
+  }
+
+</script>

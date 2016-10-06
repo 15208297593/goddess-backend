@@ -1,0 +1,99 @@
+<div class="sub-panel float-left" >
+    <table id="baseDg" title="" class="easyui-datagrid" style="width:550px;height:400px"
+        url="${cxt!}/admin/cusConfigure/getBaseMaterials/${base_type}-${base_ref_type}"
+        pagination="false" rownumbers="false" singleSelect="false" selectOnCheck="false" idField="property_id" onLoadSuccess="checkRows">
+        <thead>
+            <tr>
+                <th field="is_checked" data-options="checkbox:true"></th>
+                <th field="material_name" align='center' width="100">名称</th>
+                <th field="material_exhibition" align='center' width="100" formatter="exhibition">原材料展示</th>
+                <th field="relate_types" align='center' width="200">已关联类别</th>
+                <th field="base_addition" align='center' width="100">材料价格加成</th>
+            </tr>
+        </thead>
+    </table>
+    <div style="clear:both;height:5px"></div>
+</div>
+<div>
+    <div style="padding-left:20px;padding-top:10px">
+        <% for (rt in relate_types) { %>
+            <div class="fitem">
+                <label>${rt.type_name!}(${rt.type_name_ext!})</label>
+                  <select name="relate_ref_type_${rt.property_type_id}" style="width:100px;">
+                      <option value="">无</option>
+                      <% for (t in ref_types) { %>
+                          <option value="${t.property_type_id}">${t.type_name}</option>
+                      <% } %>
+                  </select>
+            </div>
+        <% }%>
+        <div class="fitem">
+            <label>价格加成</label>
+            <input id="price_addition" name="price_addition" class="easyui-textbox" required="true" data-options="validType:'integ'">
+        </div>
+    </div>
+    <div style="text-align:right;margin-top:10px">
+        <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-save" onclick="saveBaseRelateType()">保存</a>
+    </div>
+    <div style="clear:both;margin-bottom:5px"></div>
+    <input type="hidden" name="pids" id="pids" />
+    <input type="hidden" name="base_type" value="${base_type!}" id="base_type" />
+</div>
+<script type="text/javascript">
+
+    function exhibition(value, row, index) {
+        if (${exhibition_type} == "0") {
+            // 颜色值展示
+            return "<div class='box' style='background-color:"+value+";'></div>";
+        } else {
+            if (!value) value = "/default.jpg";
+            value = value + "?t=" + new Date().getTime();
+            return '<div style="float:left;padding:10px" class="pic"><img src="${imageUrl!}/'+ value +'" style="width:50px;" /></div>';
+        }
+    }
+    
+    function saveBaseRelateType() {
+
+        $.messager.confirm('更新关联类别','确认更新关联类别吗?',function(r){
+          if (r){
+	        $('#propertyForm').form('submit',{
+	          url: "${cxt!}/admin/cusConfigure/saveBaseRelateType",
+	          onSubmit: function(){
+	              var sMaterials = $('#baseDg').datagrid('getChecked');
+	              if (sMaterials.length == 0) {
+	
+	                  $.messager.alert('WARNING', '请至少选择一个原材料！', "warning");
+	                  return false;
+	              }
+	            // validate验证
+	            if ($('#propertyForm').form('validate')) {
+	            	
+	            	$("#pids").val(sMaterials.map(function(m){
+	                    return m.property_id;
+	                }).join(','));
+	            	return true;
+	            }
+	            return false;
+	          },
+	          success: function(result){
+	            var result = eval('('+result+')');
+	            if (result.errorMsg){
+	              $.messager.alert('Error', result.errorMsg, "error");
+	            } else {
+	              $('#baseDg').datagrid('reload');
+	              $.messager.alert('Info', "更新成功！", "info");
+	            }
+	          }
+	        });
+          }
+        });
+    }
+    
+    function checkRows() {
+        if (!$('#pids')) return;
+        var pids = $('#pids').val().split('_');
+        pids.forEach(function(id){
+            $('#baseDg').datagrid('checkRow', $('#baseDg').datagrid('getRowIndex', id));
+        });
+    }
+</script>

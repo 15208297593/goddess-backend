@@ -1,0 +1,238 @@
+<% var toolbar = { %> 
+  <form id="searchForm">
+  <div>
+    <span>用户手机号</span>
+    <input id="cell_num" name="cell_num" class="easyui-textbox">
+  </div>
+  <div style="padding:3px">
+    <span>退货订单号</span>
+    <input name="return_order_id" class="easyui-textbox">
+    <span>退货申请日期</span>
+    <input class="easyui-datebox" id="return_apply_date_from" name="return_apply_date_from" editable="false" style="width:150px"> - 
+    <input class="easyui-datebox" id="return_apply_date_to" name="return_apply_date_to" editable="false" style="width:150px">
+    <span style="margin-left:20px">订单状态</span>
+    <select id="return_status" class="easyui-combobox" name="return_status" style="width:120px;" editable="false">
+      <option value="">所有</option>
+      <option value="1">已提交申请</option>
+      <option value="2">已审核</option>
+      <option value="3">已入库</option>
+      <option value="4">已退款</option>
+      <option value="5">未退款完成</option>
+    </select>
+    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-search" onclick="doSearch()">检索</a>
+  </div>
+  </form>
+<%};
+var datagrid = { %> 
+    <table id="dg">
+    </table>
+<%};
+var dialog = { %> 
+<%};
+var otherDialogs = { %> 
+    <div id="orderdlg" class="easyui-dialog" style="width:500px;height:250px;padding:10px 20px" modal="true" closed="true" buttons="#otherDlg_buttons">
+        <div class="fitem forRefund dlgBlock">
+	        <label>退款金额</label>
+            <input id="refund_fee" name="refund_fee" class="easyui-textbox" data-options="required:true,validType:'integer'" />
+            <input id="ceil_fee" name="ceil_fee" type="hidden" />
+	    </div>
+    </div>
+    <div id="otherDlg_buttons">
+	    <a href="javascript:void(0)" class="easyui-linkbutton c6" iconCls="icon-ok" onclick="send()" style="width:90px">发送</a>
+	    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-cancel" onclick="javascript:$('#orderdlg').dialog('close')" style="width:90px">取消</a>
+    </div>
+<%};
+var dlg_buttons = { %> 
+<%};
+include("/listLayout.html",
+        {toolbar:toolbar,
+        datagrid:datagrid, 
+        dialog:dialog, 
+        dlg_buttons:dlg_buttons,
+        otherDialogs:otherDialogs,
+        dialog_title:""}){}
+%>
+
+<!-- <div class="easyui-layout" id="customizeLayout" style="height:500px">
+    <div data-options="region:'north',collapsible:false,border: false" style="height:300px"></div>
+</div> -->
+<script type="text/javascript" src="${cxt!}/www/js/datagrid-detailview.js"></script>
+<script type="text/javascript">
+
+  $(function(){
+	  var buttons = $.extend([], $.fn.datebox.defaults.buttons);
+	  buttons.splice(1, 1, {
+	      text: 'Clear',
+	      handler: function(target){
+	    	  $(target).datebox("setValue", "");
+	    	  $(this).closest("div.combo-panel").panel("close");
+	      }
+	  });
+	  $('#return_apply_date_from').datebox({
+	      buttons: buttons
+	  });
+	  $('#return_apply_date_to').datebox({
+	      buttons: buttons
+	  });
+
+      $("#delivery_com_no").change(function(){
+          if ($(this).val() == "nvshenzhuyi") {
+              $("#delivery_no").textbox("setValue", "NS"+new Date().getTime());
+          }
+          else {
+              $("#delivery_no").textbox("clear");
+          }
+      });
+  });
+  function doSearch() {
+
+	var return_apply_date_from = $("#return_apply_date_from").datebox("getValue");
+	var return_apply_date_to = $("#return_apply_date_to").datebox("getValue");
+	if (return_apply_date_from && return_apply_date_to && return_apply_date_from > return_apply_date_to) {
+        $.messager.alert('Warning', '开始时间应比结束时间早！');
+        return;
+	}
+	var return_status = {"1": "已提交申请","2": "已审核","3": "已入库","4": "已退款","5": "未退款完成"};
+	var pay_mode = {1:'微信支付',2:'支付宝支付'};
+	var delivery_com = {'nvshenzhuyi':'女神','shunfeng':'顺丰'};
+    $('#dg').datagrid({
+        title:'',
+        iconCls:'icon-edit',
+        width:1500,
+        height:500,
+        singleSelect:true,
+        idField:'order_id',
+        pagination:true,
+        url:"${cxt!}/admin/return/searchOrders?"+$("#searchForm").serialize(),
+        columns:[[
+            {field:'return_order_id',title:'退货订单号',width:120,halign:'center',formatter:function(value, row) {
+                return "<span class='break-line'>" + value+"</span>";
+            }},
+            {field:'order_id',title:'订单号',width:120,halign:'center',formatter:function(value, row) {
+                return "<span class='break-line'>" + value+"</span>";
+            }},
+            {field:'nick_name',title:'买家',width:100,halign:'center',formatter:function(value, row) {
+                return value+", "+"<span class='break-line'>" + row.cell_num+"</span>";
+            }},
+            {field:'apply_refund_fee',title:'申请退款金额',width:130,halign:'center',formatter:function(value, row) {
+                return "<span>"+value+"元</span>";
+            }},
+            {field:'return_reason',title:'退货原因',width:130,halign:'center',formatter:function(value, row) {
+                return "<span class='break-line'>" + value+"</span>";
+            }},
+            {field:'return_apply_date',title:'退货申请日期',width:150,halign:'center'},
+            {field:'wx_error_msg',title:'退款状态',width:150,align:'center',formatter:function(value, row) {
+                return "<span class='break-line'>" +"退款微信单号："+(row.refund_transaction_id || "") + "</span><br/>"+
+                "<span class='break-line'>" + (value || "") +"</span>";
+            }},
+            {field:'refund_fee',title:'退款金额',width:130,halign:'center',formatter:function(value, row) {
+                return "<span>"+value+"元</span>";
+            }},
+            {field:'refund_date',title:'退款日期',width:150,halign:'center'},
+            {field:'return_status',title:'退货订单状态',width:150,align:'center',formatter:function(value) {
+                return return_status[value];
+            }},
+            {field:'actions',title:'操作',width:150,formatter:actions,align:'center'}
+        ]],
+        view: detailview,
+        detailFormatter:function(index,row){
+            return '<div class="orderCommodities" style="padding:5px 0"></div>';
+        },
+        onExpandRow: function(index,row){
+            var ddv = $(this).datagrid('getRowDetail',index).find('div.orderCommodities');
+            ddv.panel({
+                border:false,
+                cache:false,
+                href:'${cxt!}/admin/return/getReturnCommodity/'+row.return_commodity_id,
+                onLoad:function(){
+                    $('#dg').datagrid('fixDetailRowHeight',index);
+                }
+            });
+            $('#dg').datagrid('fixDetailRowHeight',index);
+        }
+    });
+  }
+  
+  function formatPic(value, row, index) {
+    if (!value) value="default.jpg";
+    return '<img src="${imageUrl!}/' + value +'" style="width:100px;height:100px" >'
+  }
+  
+  function actions(value, row, index) {
+      var res = '<a href="#" onclick="terminate('+row.return_order_id+')">终止退货</a><br/> ';
+      if (row.return_status == '1') {
+        res += '<a href="#" onclick="approve('+row.return_order_id+')">审核通过</a><br/>';
+      } else if(row.return_status == '2'){
+        res += '<a href="#" onclick="storage('+row.return_order_id+')">退货入库</a><br/>';
+      } else if (row.return_status == '3') {
+        res += '<a href="#" onclick="refund('+row.return_order_id+','+row.payment+')">退款给客户</a><br/> ';
+      } else {
+        return '';
+      }
+      return res;
+  }
+
+  var url;
+  // 审核通过
+  function approve(return_order_id) {
+
+      $.messager.confirm('Confirm','确认退货申请吗?',function(r){
+        if (r){
+            $.get("${cxt!}/admin/return/approve/"+return_order_id ,function(result){
+                if (result.errorMsg){
+                  $.messager.alert( 'Error', result.errorMsg);
+                } else {
+                    $('#dg').datagrid('reload');      // reload data
+                }
+              },'json');
+        }
+      });
+  }
+  
+  function storage(return_order_id) {
+
+      $.messager.confirm('Confirm','客户退货入库吗?',function(r){
+        if (r){
+            $.get("${cxt!}/admin/return/stock/"+return_order_id ,function(result){
+                if (result.errorMsg){
+                  $.messager.alert( 'Error', result.errorMsg);
+                } else {
+                    $('#dg').datagrid('reload');      // reload data
+                }
+              },'json');
+        }
+      });
+  }
+  
+  function refund(return_order_id, ceil_fee) {
+
+     $('#orderdlg').dialog({title:'退款给客户'}).dialog('open');
+     $('.dlgBlock').hide();
+     $('.forRefund').show();
+     $('#ceil_fee').val(fee);
+     url = "${cxt!}/admin/return/refund/"+return_order_id;
+  }
+  
+  function send() {
+	  var params = {};
+	  if ($(".forRefund").is(":visible")) {
+		  if (!$("#refund_fee").textbox('isValid')) return;
+		  
+		  var refundFee = $("#refund_fee").textbox("getValue");
+		  if (refundFee > $("#ceil_fee").val()) {
+              $.messager.alert( 'Warning', "退款金额大于付款金额！");
+              return;
+		  }
+          url += "-"+refundFee;
+	  }
+      $.post(url, params, function(result){
+        if (result.errorMsg){
+          $.messager.alert( 'Error', result.errorMsg);
+        } else {
+
+        	$('#orderdlg').dialog('close');        // close the dialog
+            $('#dg').datagrid('reload');      // reload data
+        }
+      },'json');
+  }
+</script>

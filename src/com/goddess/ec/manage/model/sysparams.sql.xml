@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<sql-statement namespace="manage.sysparams">
+
+    <sql id="getSystemParams">
+        <![CDATA[ 
+            select category,
+                   code,
+                   text 
+              from system_params
+             where category = ?
+        ]]>
+    </sql>
+
+    <sql id="insertSystemParams">
+        <![CDATA[ 
+            INSERT INTO system_params(category, code, text) VALUES(?,?,?)
+        ]]>
+    </sql>
+
+    <sql id="updateSystemParams">
+        <![CDATA[ 
+            update system_params
+               set code = ?,
+                   text = ?
+             where category = ?
+        ]]>
+    </sql>
+
+    <sql id="deleteSystemParams">
+        <![CDATA[ 
+       delete from system_params
+             where category = ?
+               and code = ?
+        ]]>
+    </sql>
+
+    <sql id="deleteByCategory">
+        <![CDATA[ 
+       delete from system_params
+             where category = ?
+        ]]>
+    </sql>
+</sql-statement>

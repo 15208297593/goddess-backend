@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<sql-statement namespace="manage.classification">
+
+    <sql id="getClassificationByCategory">
+        <![CDATA[
+            select classification_id as id,
+			       classification_name as name,
+			       classification_level as level,
+			       rank,
+			       parent_id,
+			       category
+			  from classification
+			 where category = ?
+		  order by level,rank
+        ]]>
+    </sql>
+
+    <sql id="getAllClassification">
+        <![CDATA[
+            select classification_id as id,
+			       classification_name as name,
+			       classification_level as level,
+			       rank,
+			       parent_id,
+			       category
+			  from classification
+		  order by category,level,rank
+        ]]>
+    </sql>
+    <!-- 
+    <sql id="getCatagory">
+        <![CDATA[
+            select classification_id as id,
+			       classification_name as name,
+			       classification_level as level,
+			       rank,
+			       parent_id
+			  from classification
+			 where classification_level = 0
+		  order by rank
+        ]]>
+    </sql> -->
+
+    <sql id="deleteClassifications">
+        <![CDATA[
+            delete 
+              from classification
+             where classification_id in ${ids}
+        ]]>
+    </sql>
+    
+    <sql id="deleteCommodityClassifications">
+        <![CDATA[
+            delete 
+              from commodity_classification
+             where classification_id in ${ids}
+        ]]>
+    </sql>
+</sql-statement>

@@ -1,0 +1,134 @@
+package com.goddess.ec.manage.service;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.log4j.Logger;
+
+import com.goddess.ec.manage.common.SplitPage;
+import com.goddess.ec.manage.tools.ToolSqlFormatter;
+import com.goddess.ec.manage.tools.ToolSqlXml;
+import com.jfinal.plugin.activerecord.Db;
+import com.jfinal.plugin.activerecord.Record;
+
+public class PrototypeService extends BaseService {
+
+    @SuppressWarnings("unused")
+    private static Logger log = Logger.getLogger(PrototypeService.class);
+
+    public static final PrototypeService service = new PrototypeService();
+
+    /**
+     * 分页显示原型
+     * @param sp
+     */
+    public void getPrototypes(SplitPage sp) {
+    	splitPageBase(sp, "select * ", "manage.prototype.all");
+    }
+    
+    public List<Record> getAllPrototypes() {
+    	return Db.find(ToolSqlXml.getSql("manage.prototype.getAllPrototypes"));
+    }
+    
+    public List<Record> getPrototypeAccessory(int prototypeId) {
+    	return Db.find(ToolSqlXml.getSql("manage.prototype.getPrototypeAccessory"), prototypeId);
+    }
+
+    public List<Record> getMaterialTypes() {
+    	return Db.find(ToolSqlXml.getSql("manage.prototype.getMaterialTypes"));
+    }
+    
+    /**
+     * 
+     * @param prototypeId
+     */
+    public List<Record> getPropertyTypes(int prototypeId) {
+    	List<Record> records = Db.find(ToolSqlXml.getSql("manage.prototype.getPropertyTypes"), prototypeId);
+    	return records;
+    }
+    
+    public String getTypeRank(int prototypeId) {
+    	Record rank = Db.findFirst(ToolSqlXml.getSql("manage.prototype.getTypeRank"), prototypeId);
+    	if (rank != null) return rank.getStr("rank");
+    	return null;
+    }
+
+    public String getPropertyRank(int propertyTypeId) {
+    	Record rank = Db.findFirst(ToolSqlXml.getSql("manage.prototype.getPropertyRank"), propertyTypeId);
+    	if (rank != null) return rank.getStr("rank");
+    	return null;
+    }
+    
+    /**
+     * 
+     * @param prototypeId
+     */
+    public List<Record> getProperties(int materialTypeId, int propertyTypeId) {
+
+    	if (propertyTypeId == 0) {
+    		return Db.find(ToolSqlXml.getSql("manage.prototype.getProperties"), materialTypeId);
+    	} else {
+    		return Db.find(ToolSqlXml.getSql("manage.prototype.getPropertiesWithTypeId"), propertyTypeId, materialTypeId);
+    	}
+    }
+    
+    public int[] saveProperties(List<Record> properties) {
+		return Db.batch(ToolSqlXml.getSql("manage.prototype.saveProperty"), "property_type_id, material_id", properties, properties.size());
+    }
+    
+    public int[] savePropertiesWithRank(List<Record> properties) {
+    	return Db.batch(ToolSqlXml.getSql("manage.prototype.savePropertiesWithRank"), "property_type_id, material_id, rank", properties, properties.size());
+    }
+    
+    public int deleteProperties(List<String> properties) {
+    	
+    	String inParam = ToolSqlFormatter.formatInPart(properties.size());
+    	Map<String, Object> params = new HashMap<String, Object>();
+    	params.put("properties", inParam);
+    	return Db.update(ToolSqlXml.getSql("manage.prototype.deleteProperty", params), properties.toArray());
+    }
+    
+    public boolean deletePropertiesByType(int propertyTypeId) {
+    	return Db.update(ToolSqlXml.getSql("manage.prototype.deletePropertiesByType"), propertyTypeId) != 0;
+    }
+    
+    /**
+     * 删除该类别的所有子属性类别及其属性
+     * @param parentTypeId
+     * @return
+     */
+    public boolean deleteChildrenType(int parentTypeId) {
+		return Db.update("delete pt,p from property_type pt, properties p where pt.property_type_id = p.property_type_id and pt.parent_type_id = ?", parentTypeId) != 0;
+    }
+    
+    /**
+     * 删除定制品表中与该属性类别关联的记录
+     * @param prototypeId
+     * @param materialTypeId
+     */
+    public void deleteCustomizationByType(int prototypeId, int materialTypeId) {
+    	Db.update(ToolSqlXml.getSql("manage.prototype.deleteCustomizationByType"), prototypeId, materialTypeId);
+    }
+
+    /**
+     * 删除定制品表中与该属性关联的记录
+     * 
+     * @param properties
+     */
+    public void deleteCustomizationByProperties(List<Record> properties) {
+    	Db.batch(ToolSqlXml.getSql("manage.prototype.deleteCustomizationByProperties"), "prototype_id,material_type_id,material_id", properties, properties.size());
+    }
+    
+    public int[] updateTypeRank(List<Record> typeRank) {
+    	return Db.batch(ToolSqlXml.getSql("manage.prototype.updateTypeRank"), "rank, property_type_id", typeRank, typeRank.size());
+    }
+    
+    public int[] updatePropertyRank(List<Record> propertyRank) {
+    	return Db.batch(ToolSqlXml.getSql("manage.prototype.updatePropertyRank"), "rank, property_id", propertyRank, propertyRank.size());
+    }
+    
+    public void deletePrototypeAccByType(int prototypeId, String accessoryType) {
+    	Db.update(ToolSqlXml.getSql("manage.prototype.deletePrototypeAccByType"), prototypeId, accessoryType);
+    }
+}

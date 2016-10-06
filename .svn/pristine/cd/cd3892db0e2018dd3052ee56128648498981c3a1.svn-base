@@ -1,0 +1,141 @@
+<div class="sub-panel">
+    <div style="text-align:right;margin-top:10px">
+        <% if(isEmpty(property_type.property_type_id)) { %>
+            <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-add" onclick="savePropertyType()">保存类别</a>
+        <% } else { %>
+            <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-edit" onclick="updatePropertyType()">更新类别</a>
+        <% }%>
+    </div>
+    <div style="padding-left:20px">
+        <div class="fitem for_update_input">
+            <label>类别id</label>${property_type.property_type_id!}
+        </div>
+        <div class="fitem">
+            <label>是否基本类别</label>
+            <select id="is_base" name="is_base" style="width:100px;" editable="false" onchange="changeBase(this)">
+                  <option value="0" ${property_type.is_base! == "0" ? "selected='selected'" : ""}>否</option>
+                  <option value="1" ${property_type.is_base! == "1" ? "selected='selected'" : ""}>是</option>
+            </select>
+        </div>
+        <div class="fitem">
+            <label>使用类别</label>
+              <select id="ref_type_id" name="ref_type_id" style="width:100px;" onchange="changeMType()">
+              </select>
+        </div>
+        <div class="fitem for_update_input">
+            <label>类别名称</label>
+            <input id="type_name" name="type_name" value="${property_type.type_name}" class="easyui-textbox" required="true" data-options="validType:'maxLength[16]'">
+        </div>
+        <div class="fitem for_update_input">
+            <label>类别名称（英文）</label>
+            <input id="type_name_ext" name="type_name_ext" value="${property_type.type_name_ext}" class="easyui-textbox" required="true" data-options="validType:'maxLength[16]'">
+        </div>
+        <div class="fitem type_rank">
+            <label>显示顺序</label>
+            <input id="type_rank" name="rank" value="${property_type.rank}" prompt="0~100" class="easyui-textbox">
+            <span style="color:red">* 0~100,数值越高越靠前，默认为0;子属性类别不能设置</span>
+        </div>
+    </div>
+    <hr/>
+    <div style="clear:both;margin-bottom:5px"></div>
+	<input type="hidden" name="property_type_id" value="${property_type.property_type_id!}" id="property_type_id" />
+	<input type="hidden" name="base_ref_type" value="${property_type.base_ref_type}" id="base_ref_type" />
+</div>
+<script type="text/javascript">
+
+    var refTypes = JSON.parse('${ref_types}');
+    $(function(){
+
+        if("${property_type.is_base!}" == "1") {
+        	formatRefTypes('${property_type.base_ref_type!}');
+        } else {
+            $("#ref_type_id").html('<option value="">无</option>');
+        }
+    	
+    });
+    
+    function formatRefTypes(sType) {
+    	$("#ref_type_id").html(refTypes.map(function(t){
+    		return "<option extname='"+t.type_name_ext+"' "+ (sType == t.property_type_id ? " selected = 'selected' " : "") +" value='"+t.property_type_id+"'>"+t.type_name+"</option>";
+    	}).join(''));
+    }
+    
+    function changeBase(obj) {
+    	var isBase = $(obj).val();
+    	if (isBase == "1") {
+            formatRefTypes('');
+    	} else {
+            $("#ref_type_id").html('<option value="">无</option>');
+    	}
+    }
+    
+    function changeMType() {
+
+        var type = $("#ref_type_id option:selected");
+        $("#type_name_ext").textbox('setValue', type.attr("extname"));
+        $("#type_name").textbox('setValue', type.text());
+    }
+	
+    function savePropertyType(obj) {
+
+        $('#propertyForm').form('submit',{
+          url: "${cxt!}/admin/prototype/savePropertyTypeByPid",
+          onSubmit: function(){
+        	// validate验证
+            if ($('#propertyForm').form('validate') && checkType()) return true;
+            return false;
+          },
+          success: function(result){
+            var result = eval('('+result+')');
+            if (result.errorMsg){
+              $.messager.alert('Error', result.errorMsg, "error");
+            } else {
+              $('#typeDg').datagrid('reload');
+              $.messager.alert('Info', "更新成功！", "info");
+            }
+          }
+        });
+    }
+    
+    function checkType() {
+        // 类别显示顺序是否重复
+        var typeRank = parseInt($("#type_rank").val());
+        // 是否已经存在基本类型
+        var isBase = $('#is_base').val();
+        if (typeRank || isBase == '1') {
+            var cur_property_type_id = $("#property_type_id").val();
+            return $('#typeDg').datagrid('getRows').every(function(row){
+                if (row.property_type_id != cur_property_type_id && typeRank == row.rank) {
+                    $.messager.alert( 'warning', "属性类别的显示顺序重复！", "warning");
+                    return false;
+                } else if (isBase == '1' && row.property_type_id != cur_property_type_id && row.is_base == '1') {
+                    $.messager.alert( 'warning', "只能设置一个基本类型！", "warning");
+                    return false;
+                }
+                return true;
+            });
+        }
+        return true;
+    }
+    
+    function updatePropertyType() {
+
+    	var baseRefType = $('#base_ref_type').val();
+        checkUpdate((baseRefType && (baseRefType != $('#ref_type_id').val())), 'checkUpdateType', $("#property_type_id").val(),',仍然删除吗?', function(){
+	        $('#propertyForm').form('submit',{
+	          url: "${cxt!}/admin/prototype/updatePropertyTypeByPid",
+	          onSubmit: function(){
+	          },
+	          success: function(result){
+	            var result = eval('('+result+')');
+	            if (result.errorMsg){
+	              $.messager.alert('Error', result.errorMsg, "error");
+	            } else {
+                  $('#typeDg').datagrid('reload');
+	              $.messager.alert('Info', "更新成功！", "info");
+	            }
+	          }
+	        });
+        });
+    }
+</script>

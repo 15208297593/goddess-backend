@@ -1,0 +1,104 @@
+<% var toolbar = { %> 
+    
+  <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-add" onclick="insertType()">添加新类别</a>
+<%};
+var dialog = { %> 
+<%};
+var datagrid = { %> 
+    <table id="dg" title="" class="easyui-datagrid" style="width:420px;height:600px"
+        url="${cxt!}/admin/property/getPropertyTypes"
+        toolbar="#toolbar" pagination="true"
+        rownumbers="false" singleSelect="true">
+        <thead>
+            <tr>
+                <th field="property_type_id" width="60" align='center'>类别id</th>
+                <th field="type_name" width="100">类别名称</th>
+                <th field="m_type_name" width="100">原材料类别</th>
+                <th field="action" width="150" formatter="actions" align='center'>操作</th>
+            </tr>
+        </thead>
+    </table>
+<%};
+var dlg_buttons = { %> 
+    <a href="javascript:void(0)" class="easyui-linkbutton c6" iconCls="icon-ok" onclick="save()" style="width:90px">保存</a>
+    <a href="javascript:void(0)" class="easyui-linkbutton" iconCls="icon-cancel" onclick="javascript:$('#dlg').dialog('close')" style="width:90px">关闭</a>
+<%};
+var otherDialogs = { %> 
+<%};
+include("/listLayout.html",
+        {toolbar:toolbar,
+        dialog:dialog, 
+        datagrid:datagrid,
+        dlg_buttons:dlg_buttons,
+        otherDialogs:otherDialogs,
+        dialog_title:"类别属性"}){}
+%>
+
+<script type="text/javascript">
+
+  $(function(){
+    $('#fm').attr('enctype', 'multipart/form-data');
+  });
+  
+  function actions(value,row) {
+      return '<a href="#" onclick="editType('+row.property_type_id+')">编辑</a> '
+           + '<a href="#" onclick="deleteType('+row.property_type_id+')">删除</a> ';
+  }
+  
+  function insertType() {
+    $('#dlg').dialog({
+        closed: false,
+        cache: false,
+        title: "添加属性类别",
+        href:"${cxt!}/admin/property/getPropertyType/"
+    });
+  }
+  
+  function editType(id) {
+    $('#dlg').dialog({
+        closed: false,
+        cache: false,
+        title: "更新属性类别",
+        href:"${cxt!}/admin/property/getPropertyType/"+id
+    });
+  }
+  
+  function deleteType(property_type_id){
+    $.messager.confirm('删除类别','引用此类别的基础款属性类别也将删除，确定删除该类别吗?',function(r){
+        if (r){
+            checkUpdate(true,'checkUpdatePropertyType/'+property_type_id,',仍然删除吗?',function() {
+	            // 删除类别
+	            $.get('${cxt!}/admin/material/deleteMaterialType/' + property_type_id, function(result){
+	              if (result.errorMsg){
+	                $.messager.alert( 'Error', result.errorMsg);
+	              } else {
+	                $('#dg').datagrid('reload');  // reload data
+	              }
+	            },'json');
+            });
+        }
+    });
+  }
+  
+  function checkUpdate(needCheck, url,alert, confirmAction, cancelAction) {
+
+	  if (!needCheck) {
+		  confirmAction.call();
+		  return;
+	  }
+      $.get('${cxt!}/admin/property/'+url,function(result){
+        if (result.errorMsg){
+          $.messager.confirm('Confirm', result.errorMsg+alert,function(r){
+              if (r) {
+            	  confirmAction.call();
+              } else if (cancelAction) {
+            	  cancelAction.call();
+              }
+          });
+        } else {
+        	confirmAction.call();
+        }
+      },'json');
+  }
+
+</script>
